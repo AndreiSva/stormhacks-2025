@@ -7,34 +7,47 @@ export const mainScene = new THREE.Scene();
 let currentScene = mainScene;
 let isGraphicsInitialized: boolean = false;
 
+
 class Player {
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, camera?: THREE.PerspectiveCamera) {
     const loader = new GLTFLoader();
     loader.load(
-	  'low_poly_violin/scene.gltf',
-	  function (gltf) {
-		scene.add(gltf.scene);
+      '/low_poly_violin/scene.gltf',
+      (gltf) => {
+        const root = gltf.scene;
+        root.traverse(o => {
+          if ((o as THREE.Mesh).isMesh) {
+            (o as THREE.Mesh).castShadow = true;
+            (o as THREE.Mesh).receiveShadow = true;
+          }
+        });
+        scene.add(root);
 
-		gltf.animations; // Array<THREE.AnimationClip>
-		gltf.scene; // THREE.Group
-		gltf.scenes; // Array<THREE.Group>
-		gltf.cameras; // Array<THREE.Camera>
-		gltf.asset; // Object
+        if (camera && camera instanceof THREE.PerspectiveCamera) {
+          const box = new THREE.Box3().setFromObject(root);
+          const size = box.getSize(new THREE.Vector3()).length();
+          const center = box.getCenter(new THREE.Vector3());
 
-	  },
-	  // called while loading is progressing
-	  function (xhr) {
-
-		console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-
-	  },
-	  // called when loading has errors
-	  function (error) {
-		console.log('An error happened: ' + error);
-	  }
+          const fitDist = size / (2 * Math.tan((camera.fov * Math.PI) / 360));
+          const dir = new THREE.Vector3(0, 0, 1);
+          camera.position.copy(center.clone().add(dir.multiplyScalar(fitDist * 1.2)));
+          camera.near = size / 100;
+          camera.far = size * 10;
+          camera.updateProjectionMatrix();
+          camera.lookAt(center);
+        }
+      },
+      (xhr) => {
+        const pct = xhr.total ? (xhr.loaded / xhr.total) * 100 : 0;
+        console.log(pct.toFixed(1) + '% loaded');
+      },
+      (error) => {
+        console.error('GLTF load error:', error);
+      }
     );
   }
 }
+
 
 export function setCurrentScene(scene: THREE.Scene) {
   currentScene = scene;
@@ -73,23 +86,23 @@ function addTriangles(scene: THREE.Scene, triangles: Array<Array<THREE.Vector3>>
   });
 }
 
-export function startGame() {
+export function startGame(camera: THREE.PerspectiveCamera) {
   if (!isGraphicsInitialized) {
     console.log("startGame() needs graphics initialized");
     return;
   }
 
-  let player = new Player(mainScene);
+  let player = new Player(mainScene, camera);
 }
 
 export function graphicsInit() {
   console.log("Initializing Graphics...")
 
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.6);
   hemi.position.set(0, 1, 0);
   mainScene.add(hemi);
 
-  const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+  const dir = new THREE.DirectionalLight(0xffffff, 8.2);
   dir.position.set(5, 10, 7);
   dir.castShadow = true;
   mainScene.add(dir);
@@ -111,11 +124,11 @@ export function graphicsInit() {
   });
 
   isGraphicsInitialized = true;
+  startGame(camera);
 }
 
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Content Loaded");
   graphicsInit();
-  startGame();
 })
