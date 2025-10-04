@@ -6,7 +6,7 @@ const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
 let currentScene = mainScene;
 let isGraphicsInitialized: boolean = false;
-
+let modelPivot: THREE.Group | null = null;
 
 class Player {
   constructor(scene: THREE.Scene, camera?: THREE.PerspectiveCamera) {
@@ -21,7 +21,21 @@ class Player {
             (o as THREE.Mesh).receiveShadow = true;
           }
         });
-        scene.add(root);
+
+        // 1) center the pivot at the model's bbox center
+        const box = new THREE.Box3().setFromObject(root);
+        const center = box.getCenter(new THREE.Vector3());
+
+        // shift the model so its center sits at the pivot origin
+        root.position.sub(center);
+
+        // create a pivot at the original center and parent the model to it
+        modelPivot = new THREE.Group();
+        modelPivot.position.copy(center);
+        modelPivot.add(root);
+        scene.add(modelPivot);
+
+        modelPivot.rotation.x = -(Math.PI / 2 - Math.PI / 4);
 
         if (camera && camera instanceof THREE.PerspectiveCamera) {
           const box = new THREE.Box3().setFromObject(root);
