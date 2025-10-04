@@ -68,6 +68,9 @@ export function setCurrentScene(scene: THREE.Scene) {
 }
 
 function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
+  if (modelPivot) {
+    modelPivot.position.x = Math.sin(Date.now() * 0.001) * 2;
+  }
   renderer.render(currentScene, camera);
 }
 
@@ -107,6 +110,36 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   }
 
   let player = new Player(mainScene, camera);
+
+  const Direction = {
+    LEFT: "LEFT",
+    CENTER: "CENTER",
+    RIGHT: "RIGHT"
+  };
+
+  let facing = Direction.CENTER;
+  document.addEventListener("keydown", (e) => {
+    if (e.key === 'a' || e.key === 'ArrowLeft') {
+      if (facing != Direction.LEFT) {
+        modelPivot!.rotation.y = -Math.PI / 4;
+      }
+      facing = Direction.LEFT;
+    }
+
+    if (e.key === 'd' || e.key === 'ArrowRight') {
+      if (facing != Direction.RIGHT) {
+        modelPivot!.rotation.y = Math.PI / 4;
+      }
+      facing = Direction.RIGHT;
+    }
+
+    if (e.key === 's' || e.key === 'ArrowDown') {
+      if (facing != Direction.CENTER) {
+        modelPivot!.rotation.y = 0;
+      }
+      facing = Direction.CENTER;
+    }
+  });
 }
 
 export function graphicsInit() {
