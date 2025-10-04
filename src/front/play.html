@@ -2,11 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <link rel="stylesheet" href="/src/style.css" />
-    <link rel="stylesheet" href="/src/front/home.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Flight Sim</title>
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="about.css" />
+    <title>About - 3D Game</title>
   </head>
   <body>
     <!-- Header -->
@@ -23,51 +22,10 @@
       </nav>
     </header>
 
-    <!-- Main Content -->
-    <script type="module" src="/src/main.ts"></script>
-    <main class="home-main">
-      <div class="home-hero">
-        <div class="hero-content">
-          <h1 class="hero-title">
-            <span class="title-line">Take Flight</span>
-            <span class="title-line gradient-text">Defy Gravity</span>
-          </h1>
-          <p class="hero-tagline">Experience the ultimate 3D flight simulation in your browser</p>
-
-          <div class="controls-section">
-            <h3 class="controls-title">Flight Controls</h3>
-            <div class="controls-grid">
-              <div class="control-item">
-                <span class="control-key">W A S D</span>
-                <span class="control-desc">Navigate</span>
-              </div>
-              <div class="control-item">
-                <span class="control-key">Mouse</span>
-                <span class="control-desc">Look Around</span>
-              </div>
-              <div class="control-item">
-                <span class="control-key">Space</span>
-                <span class="control-desc">Boost</span>
-              </div>
-              <div class="control-item">
-                <span class="control-key">Shift</span>
-                <span class="control-desc">Brake</span>
-              </div>
-            </div>
-          </div>
-
-          <a href="/play.html" class="cta-button">
-            <span>Start Flight</span>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </a>
-        </div>
-      </div>
-    </main>
+    <!-- Main Game Content -->
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="footer-game">
       <div class="footer-content">
         <p>&copy; 2025 Flight Sim | Hackathon Project</p>
         <div class="footer-nav-links">
@@ -87,5 +45,7 @@
         </div>
       </div>
     </footer>
+
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
