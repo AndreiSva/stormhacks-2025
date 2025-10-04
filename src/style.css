@@ -74,6 +74,9 @@ main {
 .nav-links li a:hover {
   color: #00d9ff;
   background: rgba(0, 217, 255, 0.1);
+#app {
+  margin: 0 auto;
+  text-align: center;
 }
 
 .nav-links li a.active {
