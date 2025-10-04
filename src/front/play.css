@@ -1,0 +1,107 @@
+/* Play Page Specific Styles */
+
+/* ============================================
+   FIX SCROLLBARS
+   ============================================ */
+
+html {
+  overflow: hidden;
+  height: 100%;
+}
+
+body.play-body {
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header adjustments for play page */
+body.play-body .header {
+  flex-shrink: 0;
+}
+
+body.play-body .navbar {
+  position: relative;
+}
+
+/* ============================================
+   STANDARD RED EXIT BUTTON
+   ============================================ */
+
+.exit-game-btn {
+  padding: 0.6rem 1.5rem;
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  font-family: inherit;
+  margin-left: auto;
+}
+
+.exit-game-btn:hover {
+  transform: scale(1.1);
+}
+
+.exit-game-btn:active {
+  transform: scale(1.05);
+}
+
+/* ============================================
+   PLAY CONTAINER - CENTERED BOX WITH BORDER
+   ============================================ */
+
+.play-container {
+  flex: 1;
+  background: #0a0e27;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  overflow: hidden;
+}
+
+#app {
+  width: 90%;
+  max-width: 1400px;
+  height: 85%;
+  display: block;
+  position: relative;
+  border: 3px solid #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+
+#app canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .exit-game-btn {
+    padding: 0.5rem 1.2rem;
+    font-size: 0.9rem;
+  }
+
+  .play-container {
+    padding: 1rem;
+  }
+
+  #app {
+    width: 95%;
+    height: 90%;
+    border-width: 2px;
+  }
+}
