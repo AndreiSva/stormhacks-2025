@@ -4,6 +4,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
+mainScene.background = new THREE.Color(0xc91aaf);
+
 let currentScene = mainScene;
 let isGraphicsInitialized: boolean = false;
 let modelPivot: THREE.Group | null = null;
@@ -154,26 +156,37 @@ export function graphicsInit() {
   dir.castShadow = true;
   mainScene.add(dir);
 
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  // Use temporary aspect; we’ll immediately update it from appDiv’s rect.
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
   camera.position.set(0, 1.2, 3);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  appDiv.appendChild(renderer.domElement);
+
+  function resizeToApp() {
+    const rect = appDiv.getBoundingClientRect();
+    const w = Math.max(1, Math.floor(rect.width));
+    const h = Math.max(1, Math.floor(rect.height));
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    // Pass false so Three.js doesn't set canvas CSS size (we control it by parent)
+    renderer.setSize(w, h, false);
+  }
+
+  // Initial sizing
+  resizeToApp();
+
+  // React to element resizes (layout, flex, grid, sidebars, etc.)
+  const ro = new ResizeObserver(resizeToApp);
+  ro.observe(appDiv);
 
   renderer.setAnimationLoop(() => { render(renderer, camera) });
-  appDiv.appendChild(renderer.domElement);
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
 
   isGraphicsInitialized = true;
   startGame(camera);
 }
-
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Content Loaded");
