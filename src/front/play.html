@@ -98,6 +98,17 @@
           <button class="restart-game-btn" onclick="window.location.href='/src/front/play.html'">Restart</button>
           <button class="exit-game-btn" onclick="endGame()">End Game</button>
         </div>
+        <!-- Tune Detector HUD -->
+        <div id="tune-detector-hud">
+          <div class="tune-status">
+            <div class="tune-indicator"></div>
+            <span class="tune-label">Tune Detection: <span id="tune-status-text">OFF</span></span>
+          </div>
+          <div class="tune-detection-info" style="display: none">
+            <div class="detected-note" id="detected-note">--</div>
+            <div class="detected-action" id="detected-action">No input</div>
+          </div>
+        </div>
         <div id="app"></div>
       </div>
     </main>

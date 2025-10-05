@@ -1,4 +1,8 @@
 let gameStartTime = 0;
+// Tune detection UI management
+let tuneDetectionActive = false;
+let lastDetectedNote = "";
+let lastDetectedAction = "";
 
 document.addEventListener("DOMContentLoaded", () => {
   const startBtn = document.getElementById("start-game-btn");
@@ -97,6 +101,39 @@ function handlePlayerDeath(time: number) {
 (window as any).endGame = function () {
   // Call the function directly instead of dispatching event
   handlePlayerDeath(performance.now());
+};
+
+// Make tune detection UI functions available globally
+(window as any).updateTuneDetectionUI = function (note: string, action: string) {
+  lastDetectedNote = note;
+  lastDetectedAction = action;
+
+  const noteElement = document.getElementById("detected-note");
+  const actionElement = document.getElementById("detected-action");
+
+  if (noteElement && actionElement) {
+    noteElement.textContent = note;
+    actionElement.textContent = action;
+  }
+};
+
+(window as any).setTuneDetectionStatus = function (active: boolean) {
+  tuneDetectionActive = active;
+  const hud = document.getElementById("tune-detector-hud");
+  const statusText = document.getElementById("tune-status-text");
+  const detectionInfo = document.querySelector(".tune-detection-info") as HTMLElement;
+
+  if (hud && statusText && detectionInfo) {
+    if (active) {
+      hud.classList.add("active");
+      statusText.textContent = "ON";
+      detectionInfo.style.display = "block";
+    } else {
+      hud.classList.remove("active");
+      statusText.textContent = "OFF";
+      detectionInfo.style.display = "none";
+    }
+  }
 };
 
 document.addEventListener("playerhit", (e: Event) => {
