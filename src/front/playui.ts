@@ -6,8 +6,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const gameContainer = document.getElementById("game-container");
   const violinIcon = document.querySelector(".violin-icon") as HTMLElement;
   const loadingDots = document.querySelector(".loading-dots") as HTMLElement;
+  const loadingSubtitle = document.querySelector(".loading-subtitle") as HTMLElement;
 
-  // Stop animations after 3 seconds
+  // Stop animations after 2 seconds and show checkmark + button
   setTimeout(() => {
     if (violinIcon) {
       violinIcon.style.animation = "none";
@@ -17,10 +18,20 @@ document.addEventListener("DOMContentLoaded", () => {
         (dot as HTMLElement).style.animation = "none";
       });
     }
+
+    // Show green checkmark
+    if (loadingSubtitle) {
+      loadingSubtitle.innerHTML = '<span style="color: #10b981; font-size: 2rem;">✓</span> Ready for Takeoff';
+      loadingSubtitle.style.color = "#10b981";
+    }
+
+    // Show start button
+    if (startBtn) {
+      startBtn.style.display = "block";
+    }
   }, 2000);
 
   if (startBtn && loadingScreen && gameContainer) {
-    startBtn.style.display = "block";
     startBtn.addEventListener("click", () => {
       startBtn.textContent = "Loading...";
       gameStartTime = performance.now();
