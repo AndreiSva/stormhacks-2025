@@ -140,7 +140,7 @@ class TerrainChunkManager {
         const worldY = offsetY + i * scale;
         
         // Compute fBm
-        let amplitude = 1.0;
+        let amplitude = 5;
         let frequency = 2.0;
         let noiseValue = 1.0;
         let maxValue = 0.0; // For normalization
