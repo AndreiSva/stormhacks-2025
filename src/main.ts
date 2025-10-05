@@ -526,11 +526,20 @@ export function graphicsInit() {
   });
 
   isGraphicsInitialized = true;
-  startGame(camera);
+  console.log("Graphics initialized.");
+
+  // Start game logic when user clicks start
+  document.addEventListener("startgame", () => {
+    console.log("Starting game...");
+    startGame(camera);
+  });
 }
 
+// At the bottom, replace with:
+
+// Initialize graphics on DOM load (creates renderer, camera, scene)
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("Content Loaded");
+  console.log("Initializing graphics engine...");
   graphicsInit();
 });
 
