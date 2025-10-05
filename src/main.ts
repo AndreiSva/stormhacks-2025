@@ -108,6 +108,7 @@ function addTriangles(scene: THREE.Scene, triangles: Array<Array<THREE.Vector3>>
     });
 
     const triangleMesh = new THREE.Mesh(geometry, material);
+    triangleMesh.position.set(1000, 0, 10000);
     scene.add(triangleMesh);
   });
 }

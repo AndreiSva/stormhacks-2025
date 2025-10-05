@@ -76,6 +76,8 @@ export function createMeshFromNoiseMap(scene: THREE.Scene, noiseMap: number[][],
       ]);
     }
   }
+  const terrainGroup = new THREE.Group();
+  
 
   // Add triangles to the scene
   addTriangles(scene, triangles);
