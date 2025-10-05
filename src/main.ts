@@ -22,12 +22,28 @@ const clock = new THREE.Clock(); // for smooth dt-based motion
 
 let currentlyFacing = Direction.CENTER;
 
+export let lives = 10;
+
+export const PLAYER_HIT_EVENT = "playerhit";
+export const PLAYER_SURVIVE_100M_EVENT = "playerSurvive100meteres";
+
+function emitPlayerHit(detail: any) {
+  document.dispatchEvent(new CustomEvent(PLAYER_HIT_EVENT, { detail }));
+}
+function emitPlayerSurvive100m(detail: any) {
+  document.dispatchEvent(new CustomEvent(PLAYER_SURVIVE_100M_EVENT, { detail }));
+}
+
+let playerColliderRadius = 0.1;    // will be updated once model loads
+let playerLoaded = false;          // becomes true after GLTF finishes
+
 class Enemie {
   scene: THREE.Scene;
   target: THREE.Object3D;
   mesh: THREE.Mesh;
   speed: number;
   velocity: THREE.Vector3
+  radius: number;
 
   constructor(opts: {
     scene: THREE.Scene,
@@ -54,6 +70,8 @@ class Enemie {
     this.mesh = new THREE.Mesh(geom, mat);
     this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
+
+    this.radius = r;
 
     if (opts.position) {
       this.mesh.position.copy(opts.position);
@@ -211,6 +229,11 @@ class Player {
         modelPivot = new THREE.Group();
         modelPivot.position.copy(center);
         modelPivot.add(root);
+        const tmpBox = new THREE.Box3().setFromObject(root);
+        const tmpSphere = tmpBox.getBoundingSphere(new THREE.Sphere());
+        // Sphere center is in world coords now; we only need the radius
+        playerColliderRadius = Math.max(0.5, tmpSphere.radius); // guard tiny models
+        playerLoaded = true;
         scene.add(modelPivot);
 
         if (camera && camera instanceof THREE.PerspectiveCamera) {
@@ -250,11 +273,11 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   if (modelPivot) {
     modelPivot.position.x = modelPivot.position.x + Math.sin(Date.now() * 0.001) * 0.05;
 
-    if (currentlyFacing == Direction.RIGHT) {
+    if (currentlyFacing == Direction.RIGHT && modelPivot.position.x < 20) {
       modelPivot.position.x += 10 * dt;
     }
 
-    if (currentlyFacing == Direction.LEFT) {
+    if (currentlyFacing == Direction.LEFT  && modelPivot.position.x > -20) {
       modelPivot.position.x -= 10 * dt;
     }
   }
@@ -267,9 +290,37 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
     }
   }
 
+  // Collision: enemies vs player
+  if (playerLoaded && modelPivot) {
+    const playerPos = new THREE.Vector3();
+    modelPivot.getWorldPosition(playerPos);
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      const dist = e.mesh.position.distanceTo(playerPos);
+      if (dist <= (e.radius + playerColliderRadius) - 10) {
+        // Fire the custom event with some useful context
+        emitPlayerHit({
+          time: performance.now(),
+          enemyIndex: i,
+          enemyPosition: e.mesh.position.clone(),
+          playerPosition: playerPos.clone()
+        });
+
+        lives = Math.max(0, lives - 1);
+
+        // Remove the enemy so it doesn't trigger again this frame
+        e.dispose();
+        enemies.splice(i, 1);
+      }
+    }
+  }
+
   renderer.render(currentScene, camera);
 }
 
+
+// this is the only good part in this code because it was coded in the morning
 function addTriangles(scene: THREE.Scene, triangles: Array<Array<THREE.Vector3>>) {
   triangles.forEach((triangle) => {
     const a = triangle[0];
@@ -338,6 +389,12 @@ export function startGame(camera: THREE.PerspectiveCamera) {
       }
       facing = Direction.CENTER;
     }
+
+    const surviveHandle = setInterval(() => {
+      emitPlayerSurvive100m({
+        time: performance.now()
+      });
+    }, 1000);
 
     currentlyFacing = facing;
   });
@@ -411,3 +468,13 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log("Content Loaded");
   graphicsInit();
 })
+
+document.addEventListener(PLAYER_HIT_EVENT, (e: Event) => {
+  const ce = e as CustomEvent;
+  console.log("[EVENT] playerhit", ce.detail);
+});
+
+document.addEventListener(PLAYER_SURVIVE_100M_EVENT, (e: Event) => {
+  const ce = e as CustomEvent;
+  console.log("[EVENT] playerSurvive100meteres", ce.detail);
+});
