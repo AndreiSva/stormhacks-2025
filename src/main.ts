@@ -1,7 +1,12 @@
 import "./style.css";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { generateAndRenderTerrain } from "../gen_terrain.ts";
+import { 
+  initializeInfiniteTerrain, 
+  updateInfiniteTerrain, 
+  getTerrainStats,
+  disposeInfiniteTerrain 
+} from "../gen_terrain.ts";
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
@@ -92,8 +97,8 @@ class Enemie {
     const { scene, target } = opts;
     this.scene = scene;
     this.target = target;
-    this.speed = opts.speed ?? 5.0; // <-- respect provided speed
-    this.velocity = opts.velocity?.clone()?.normalize() ?? new THREE.Vector3(0, -1, 0); // default +Y
+    this.speed = opts.speed ?? 5.0;
+    this.velocity = opts.velocity?.clone()?.normalize() ?? new THREE.Vector3(0, -1, 0);
 
     const r = 2;
     const geom = new THREE.SphereGeometry(r, 16, 16);
@@ -125,10 +130,10 @@ class Enemie {
 
     // Cull after it has passed the player by 10 units in its travel direction
     const relY = this.mesh.position.y - playerPos.y;
-    if (this.velocity.y < 0 && relY < -50) return false; // moving down, passed below
-    if (this.velocity.y > 0 && relY > 50) return false; // moving up, passed above
+    if (this.velocity.y < 0 && relY < -50) return false;
+    if (this.velocity.y > 0 && relY > 50) return false;
 
-    if (this.mesh.position.lengthSq() > 1e6) return false; // safety
+    if (this.mesh.position.lengthSq() > 1e6) return false;
     return true;
   }
 
@@ -138,81 +143,16 @@ class Enemie {
     (this.mesh.material as THREE.Material).dispose();
   }
 
-  static spawnFromNegativeZ(opts: {
-    scene: THREE.Scene;
-    target: THREE.Object3D;
-    zMin?: number;
-    zMax?: number;
-    xSpread?: number;
-    y?: number;
-    speed?: number;
-  }): Enemie {
-    const zMin = opts.zMin ?? 20;
-    const zMax = opts.zMax ?? 40;
-    const xSpread = opts.xSpread ?? 6;
-    const y = opts.y ?? 0.6;
-
-    const targetPos = new THREE.Vector3();
-    opts.target.getWorldPosition(targetPos);
-
-    // pick a z behind the player (more negative)
-    const behind = -(zMin + Math.random() * (zMax - zMin));
-    const pos = new THREE.Vector3(
-      targetPos.x + (Math.random() * 2 - 1) * xSpread, // lateral jitter
-      y,
-      targetPos.z + behind
-    );
-
-    return new Enemie({
-      scene: opts.scene,
-      target: opts.target,
-      position: pos,
-      speed: opts.speed ?? 2.2,
-    });
-  }
-
-  static spawnFromNegativeY(opts: {
-    scene: THREE.Scene;
-    target: THREE.Object3D;
-    yMin?: number; // how far below to start (near)
-    yMax?: number; // how far below to start (far)
-    xSpread?: number; // +/- range around target.x
-    zSpread?: number; // +/- range around target.z
-    speed?: number;
-  }): Enemie {
-    const yMin = opts.yMin ?? 20;
-    const yMax = opts.yMax ?? 40;
-    const xSpread = opts.xSpread ?? 6;
-    const zSpread = opts.zSpread ?? 6;
-
-    const targetPos = new THREE.Vector3();
-    opts.target.getWorldPosition(targetPos);
-
-    const below = -(yMin + Math.random() * (yMax - yMin)); // negative offset
-    const pos = new THREE.Vector3(
-      targetPos.x + (Math.random() * 2 - 1) * xSpread, // lateral jitter (X)
-      targetPos.y + below, // start below
-      targetPos.z + (Math.random() * 2 - 1) * zSpread // lateral jitter (Z)
-    );
-
-    return new Enemie({
-      scene: opts.scene,
-      target: opts.target,
-      position: pos,
-      speed: opts.speed ?? 2.2,
-    });
-  }
-
   static spawnFromAboveY(opts: {
     scene: THREE.Scene;
     target: THREE.Object3D;
-    yMin?: number; // near distance above (positive)
-    yMax?: number; // far distance above (positive)
+    yMin?: number;
+    yMax?: number;
     xSpread?: number;
     zSpread?: number;
     speed?: number;
   }): Enemie {
-    const yMin = opts.yMin ?? 18; // positive distances
+    const yMin = opts.yMin ?? 18;
     const yMax = opts.yMax ?? 36;
     const xSpread = opts.xSpread ?? 6;
     const zSpread = opts.zSpread ?? 6;
@@ -220,10 +160,10 @@ class Enemie {
     const targetPos = new THREE.Vector3();
     opts.target.getWorldPosition(targetPos);
 
-    const dist = yMin + Math.random() * (yMax - yMin); // 18..36
+    const dist = yMin + Math.random() * (yMax - yMin);
     const pos = new THREE.Vector3(
       targetPos.x + (Math.random() * 2 - 1) * xSpread,
-      targetPos.y + dist, // actually above the player
+      targetPos.y + dist,
       targetPos.z + (Math.random() * 2 - 1) * zSpread
     );
 
@@ -232,7 +172,7 @@ class Enemie {
       target: opts.target,
       position: pos,
       speed: opts.speed ?? 2.2,
-      velocity: new THREE.Vector3(0, -1, 0), // straight down
+      velocity: new THREE.Vector3(0, -1, 0),
     });
   }
 }
@@ -251,37 +191,20 @@ class Player {
           }
         });
 
-        // 1) center the pivot at the model's bbox center
         const box = new THREE.Box3().setFromObject(root);
         let center = box.getCenter(new THREE.Vector3());
-
-        // shift the model so its center sits at the pivot origin
         root.position.sub(center);
 
-        // HELP ME OH SO HELP ME GOD WHAT THE HELL IS THIS CODE WHAT THE HELL
-
-        // create the hierarchy:
-        // playerRoot (moves & rotates actual heading)
-        //   └─ modelPivot (keeps visual yaw/lean)
-        //        └─ gltf root
         playerRoot = new THREE.Group();
         scene.add(playerRoot);
-        playerRoot.position.z = 10.0;
+        playerRoot.position.set(0, 0, 10.0);
 
         modelPivot = new THREE.Group();
         playerRoot.add(modelPivot);
 
-        // shift model so its center sits at pivot origin
-        {
-          const box = new THREE.Box3().setFromObject(root);
-          let center = box.getCenter(new THREE.Vector3());
-        }
         root.position.sub(center);
-
-        // add the mesh
         modelPivot.add(root);
 
-        // compute a reasonable collider radius
         const tmpBox = new THREE.Box3().setFromObject(root);
         const tmpSphere = tmpBox.getBoundingSphere(new THREE.Sphere());
         playerColliderRadius = Math.max(0.5, tmpSphere.radius);
@@ -289,13 +212,11 @@ class Player {
 
         if (camera && camera instanceof THREE.PerspectiveCamera) {
           cameraRig = new THREE.Group();
-          // IMPORTANT: rig follows the true heading on playerRoot, not modelPivot
           playerRoot.add(cameraRig);
 
           cameraRig.position.set(0, 0, 0);
           cameraRig.add(camera);
 
-          // a nice offset behind/above the player
           camera.position.set(0, -20.0, 20.0);
           camera.near = 0.1;
           camera.far = 1000;
@@ -322,9 +243,7 @@ export function setCurrentScene(scene: THREE.Scene) {
 function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   const dt = clock.getDelta();
 
-  //
-  // 1) Update visual yaw on the child (modelPivot) — this is the lean/look
-  //
+  // Update visual yaw on the child (modelPivot)
   if (modelPivot) {
     const targetYaw = yawForFacing(desiredFacing);
     const curYaw = modelPivot.rotation.y;
@@ -334,9 +253,7 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
     modelPivot.rotation.y = normalizeAngle(curYaw + step);
   }
 
-  //
-  // 2) Update true heading on the parent (playerRoot) and advance forward constantly
-  //
+  // Update true heading on the parent (playerRoot) and advance forward
   if (playerRoot) {
     let turnInput = 0;
     if (turnLeftHeld) turnInput -= 1;
@@ -344,10 +261,16 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
 
     playerRoot.rotation.z = normalizeAngle(playerRoot.rotation.z + turnInput * TURN_RATE * dt);
 
-    // Move in the direction the player is facing
-    const forwardLocal = new THREE.Vector3(0, 1, 0); // local forward
-    forwardLocal.applyQuaternion(playerRoot.quaternion); // rotate by current facing
+    const forwardLocal = new THREE.Vector3(0, 1, 0);
+    forwardLocal.applyQuaternion(playerRoot.quaternion);
     playerRoot.position.addScaledVector(forwardLocal, MOVE_SPEED * dt);
+
+    // Update infinite terrain based on player position
+    updateInfiniteTerrain(
+      playerRoot.position.x,
+      playerRoot.position.y,
+      camera as THREE.PerspectiveCamera
+    );
   }
 
   // Update enemies
@@ -362,14 +285,12 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   // Collision: enemies vs player
   if (playerLoaded && playerRoot && modelPivot) {
     const playerPos = new THREE.Vector3();
-    (playerRoot ?? modelPivot)!.getWorldPosition(playerPos);
     modelPivot.getWorldPosition(playerPos);
 
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
       const dist = e.mesh.position.distanceTo(playerPos);
       if (dist <= e.radius + playerColliderRadius - 10) {
-        // Fire the custom event with some useful context
         emitPlayerHit({
           time: performance.now(),
           enemyIndex: i,
@@ -385,7 +306,6 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
           });
         }
 
-        // Remove the enemy so it doesn't trigger again this frame
         e.dispose();
         enemies.splice(i, 1);
       }
@@ -401,39 +321,22 @@ export function startGame(camera: THREE.PerspectiveCamera) {
     return;
   }
 
-  // Define terrain parameters
-  const scale = 5; // Scale of the terrain
-  const genDistance = 4; // Distance to generate terrain around the player
-  const renderDistance = 3; // Distance to render the terrain around the player
+  // Initialize infinite terrain system
+  const chunkSize = 30; // tiles per chunk
+  const tileScale = 5; // units per tile
+  const loadDistance = 4; // chunks to load around player
+  const unloadDistance = 5; // chunks to unload beyond
 
-  // Initialize player position
-  let posX = 0;
-  let posY = 0;
-  if (modelPivot) {
-    posX = modelPivot.position.x;
-    posY = modelPivot.position.y;
-  }
-
-  // Generate and render the terrain based on the player's position
-  // Pass the camera parameter
-  generateAndRenderTerrain(
-    posX,
-    posY,
-    scale,
-    genDistance,
-    renderDistance,
+  initializeInfiniteTerrain(
     mainScene,
-    camera // Add camera parameter
+    camera,
+    chunkSize,
+    tileScale,
+    loadDistance,
+    unloadDistance
   );
 
   let player = new Player(mainScene, camera);
-
-  let facing = Direction.CENTER;
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "a" || e.key === "ArrowLeft") desiredFacing = Direction.LEFT;
-    if (e.key === "d" || e.key === "ArrowRight") desiredFacing = Direction.RIGHT;
-    if (e.key === "s" || e.key === "ArrowDown") desiredFacing = Direction.CENTER;
-  });
 
   const surviveHandle = setInterval(() => {
     emitPlayerSurvive100m({
@@ -442,7 +345,7 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   }, 1000);
 
   const spawnHandle = setInterval(() => {
-    const targetForEnemies = playerRoot ?? modelPivot; // fallback if load not done
+    const targetForEnemies = playerRoot ?? modelPivot;
     if (!targetForEnemies) return;
 
     enemies.push(
@@ -461,10 +364,9 @@ export function startGame(camera: THREE.PerspectiveCamera) {
       const e = enemies.shift();
       e?.dispose();
     }
-  }, 1500); // faster cadence feels better when they come in lanes
+  }, 1500);
 
   document.addEventListener("keydown", (e) => {
-    // visual yaw (lean) — unchanged semantics
     if (e.key === "a" || e.key === "ArrowLeft") {
       desiredFacing = Direction.LEFT;
       turnLeftHeld = true;
@@ -481,11 +383,16 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   document.addEventListener("keyup", (e) => {
     if (e.key === "a" || e.key === "ArrowLeft") turnLeftHeld = false;
     if (e.key === "d" || e.key === "ArrowRight") turnRightHeld = false;
+    if (e.key === "s" || e.key === "ArrowDown") desiredFacing = Direction.CENTER;
   });
 
-  document.addEventListener("keyup", () => {
-    desiredFacing = Direction.CENTER;
-  });
+  // Log terrain stats periodically (optional)
+  setInterval(() => {
+    const stats = getTerrainStats();
+    if (stats) {
+      console.log(`Terrain: ${stats.loadedChunks} chunks, ${stats.totalVertices} vertices`);
+    }
+  }, 5000);
 }
 
 export function graphicsInit() {
@@ -500,7 +407,6 @@ export function graphicsInit() {
   dir.castShadow = true;
   mainScene.add(dir);
 
-  // Use temporary aspect; we'll immediately update it from appDiv's rect.
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
   camera.position.set(0, 1.2, 3);
 
@@ -515,14 +421,11 @@ export function graphicsInit() {
     const h = Math.max(1, Math.floor(rect.height));
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    // Pass false so Three.js doesn't set canvas CSS size (we control it by parent)
     renderer.setSize(w, h, false);
   }
 
-  // Initial sizing
   resizeToApp();
 
-  // React to element resizes (layout, flex, grid, sidebars, etc.)
   const ro = new ResizeObserver(resizeToApp);
   ro.observe(appDiv);
 
@@ -532,6 +435,7 @@ export function graphicsInit() {
 
   isGraphicsInitialized = true;
   console.log("Graphics initialized.");
+  
   document.addEventListener("startgame", () => {
     console.log("startgame event received");
     startGame(camera);
