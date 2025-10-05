@@ -1,11 +1,11 @@
 import "./style.css";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { 
-  initializeInfiniteTerrain, 
-  updateInfiniteTerrain, 
+import {
+  initializeInfiniteTerrain,
+  updateInfiniteTerrain,
   getTerrainStats,
-  disposeInfiniteTerrain 
+  disposeInfiniteTerrain
 } from "../gen_terrain.ts";
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
@@ -338,6 +338,12 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   );
 
   let player = new Player(mainScene, camera);
+  let facing = Direction.CENTER;
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "a" || e.key === "ArrowLeft") desiredFacing = Direction.LEFT;
+    if (e.key === "d" || e.key === "ArrowRight") desiredFacing = Direction.RIGHT;
+    if (e.key === "s" || e.key === "ArrowDown") desiredFacing = Direction.CENTER;
+  });
 
   const surviveHandle = setInterval(() => {
     emitPlayerSurvive100m({
@@ -385,6 +391,10 @@ export function startGame(camera: THREE.PerspectiveCamera) {
     if (e.key === "a" || e.key === "ArrowLeft") turnLeftHeld = false;
     if (e.key === "d" || e.key === "ArrowRight") turnRightHeld = false;
     if (e.key === "s" || e.key === "ArrowDown") desiredFacing = Direction.CENTER;
+  });
+
+  document.addEventListener("keyup", () => {
+    desiredFacing = Direction.CENTER;
   });
 
   // Log terrain stats periodically (optional)
@@ -436,7 +446,7 @@ export function graphicsInit() {
 
   isGraphicsInitialized = true;
   console.log("Graphics initialized.");
-  
+
   document.addEventListener("startgame", () => {
     console.log("startgame event received");
 
