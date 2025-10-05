@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/noisejs": "^2.1.0",
     "@types/three": "^0.180.0",
     "typescript": "~5.9.3",
     "vite": "^7.1.7"
