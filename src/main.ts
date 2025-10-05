@@ -49,7 +49,7 @@ class Enemie {
     scene: THREE.Scene,
     target: THREE.Object3D,
     position?: THREE.Vector3,
-    speed?: number
+    speed?: number,
     velocity?: THREE.Vector3
   }) {
     const { scene, target } = opts;
