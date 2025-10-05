@@ -1,7 +1,7 @@
-import "./style.css";
-import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { generatePerlinNoiseMap, createMeshFromNoiseMap } from "../gen_terrain.ts";
+import './style.css'
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import {generateAndRenderTerrain} from '../gen_terrain.ts';
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
@@ -252,7 +252,7 @@ class Player {
           camera.far = size * 10;
           camera.updateProjectionMatrix();
           camera.lookAt(center);
-          camera.rotation.x = THREE.MathUtils.degToRad(35);
+          camera.rotation.x = THREE.MathUtils.degToRad(65);
         }
       },
       (xhr) => {
@@ -327,46 +327,37 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   renderer.render(currentScene, camera);
 }
 
-// this is the only good part in this code because it was coded in the morning
-function addTriangles(scene: THREE.Scene, triangles: Array<Array<THREE.Vector3>>) {
-  triangles.forEach((triangle) => {
-    const a = triangle[0];
-    const b = triangle[1];
-    const c = triangle[2];
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute([a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z], 3)
-    );
-
-    geometry.computeVertexNormals();
-
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xff5533,
-      side: THREE.DoubleSide,
-      flatShading: true,
-    });
-
-    const triangleMesh = new THREE.Mesh(geometry, material);
-    triangleMesh.position.set(1000, 0, 10000);
-    scene.add(triangleMesh);
-  });
-}
 
 export function startGame(camera: THREE.PerspectiveCamera) {
   if (!isGraphicsInitialized) {
     console.log("startGame() needs graphics initialized");
     return;
   }
-  // Generate Perlin noise map
-  const width = 100; // Width of the terrain grid
-  const height = 100; // Height of the terrain grid
-  const scale = 5; // Scale of the terrain (controls smoothness)
 
-  const noiseMap = generatePerlinNoiseMap(width, height, scale);
-  // Create terrain mesh from the noise map and add it to the scene
-  createMeshFromNoiseMap(mainScene, noiseMap, width, height, scale);
+  // Define terrain parameters
+  const scale = 5; // Scale of the terrain
+  const genDistance = 4; // Distance to generate terrain around the player
+  const renderDistance = 3; // Distance to render the terrain around the player
+
+  // Initialize player position
+  let posX = 0;
+  let posY = 0;
+  if (modelPivot) {
+    posX = modelPivot.position.x;
+    posY = modelPivot.position.y;
+  }
+
+  // Generate and render the terrain based on the player's position
+  // Pass the camera parameter
+  generateAndRenderTerrain(
+    posX, 
+    posY, 
+    scale, 
+    genDistance, 
+    renderDistance, 
+    mainScene,
+    camera  // Add camera parameter
+  );
 
   let player = new Player(mainScene, camera);
 
@@ -423,6 +414,7 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   }, 1500); // faster cadence feels better when they come in lanes
 }
 
+
 export function graphicsInit() {
   console.log("Initializing Graphics...");
 
@@ -435,7 +427,7 @@ export function graphicsInit() {
   dir.castShadow = true;
   mainScene.add(dir);
 
-  // Use temporary aspect; we’ll immediately update it from appDiv’s rect.
+  // Use temporary aspect; we'll immediately update it from appDiv's rect.
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
   camera.position.set(0, 1.2, 3);
 
