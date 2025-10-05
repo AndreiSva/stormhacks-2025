@@ -192,6 +192,9 @@ class Player {
         root.position.sub(center);
 
         modelPivot = new THREE.Group();
+
+        playerRoot = new THREE.Group();
+        scene.add(playerRoot);
         playerRoot.add(modelPivot);
 
         // shift model so its center sits at pivot origin
