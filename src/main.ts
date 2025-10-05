@@ -46,6 +46,8 @@ const music = new Audio("/glamour.m4a");
 let musicPlaying = false;
 music.loop = true;
 
+const hitSound = new Audio("/hit.m4a")
+
 const TURN_SPEED = THREE.MathUtils.degToRad(360); // max deg/sec the player can turn
 let desiredFacing = Direction.CENTER;
 
@@ -291,7 +293,12 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
       const dist = e.mesh.position.distanceTo(playerPos);
-      if (dist <= e.radius + playerColliderRadius - 10) {
+
+      let playerPos2 = new THREE.Vector3(playerPos);
+      playerPos2.y += 15;
+      const dist2 = e.mesh.position.distanceTo(playerPos2)
+      if (dist <= e.radius + playerColliderRadius - 10 || dist2 <= e.radius) {
+        hitSound.play();
         emitPlayerHit({
           time: performance.now(),
           enemyIndex: i,
@@ -314,6 +321,20 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   }
 
   renderer.render(currentScene, camera);
+}
+
+function recalibrate() {
+  if (isGraphicsInitialized) {
+    if (modelPivot) {
+      for (let i = 0; i < modelPivot.position.x; i++) {
+        console.log("recalibrating...");
+        if (i < modelPivot.position.y) {
+          console.log("found issue");
+          return;
+        }
+      }
+    }
+  }
 }
 
 export function startGame(camera: THREE.PerspectiveCamera) {
