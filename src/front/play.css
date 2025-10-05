@@ -841,3 +841,115 @@ body.play-body {
     font-size: 0.9rem;
   }
 }
+
+/* ============================================
+   TUNE DETECTION HUD
+   ============================================ */
+#tune-detector-hud {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: linear-gradient(135deg, rgba(10, 14, 39, 0.9), rgba(26, 31, 58, 0.9));
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border: 2px solid rgba(0, 255, 204, 0.4);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  z-index: 99;
+  min-width: 200px;
+}
+
+#tune-detector-hud.active {
+  border-color: #00ffcc;
+  box-shadow: 0 4px 20px rgba(0, 255, 204, 0.3), 0 0 20px rgba(0, 255, 204, 0.2);
+}
+
+.tune-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.tune-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff3366;
+  animation: pulseOff 2s ease-in-out infinite;
+}
+
+#tune-detector-hud.active .tune-indicator {
+  background: #00ffcc;
+  animation: pulseOn 1s ease-in-out infinite;
+}
+
+@keyframes pulseOn {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes pulseOff {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.tune-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.tune-detection-info {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 0.8rem;
+  margin-top: 0.8rem;
+}
+
+.detected-note {
+  color: #00ffcc;
+  font-size: 1.5rem;
+  font-weight: bold;
+  font-family: "Courier New", monospace;
+  text-align: center;
+  margin-bottom: 0.3rem;
+}
+
+.detected-action {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.no-detection {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85rem;
+  text-align: center;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  #tune-detector-hud {
+    top: 8rem;
+    right: 0.5rem;
+    padding: 0.8rem 1rem;
+    min-width: 150px;
+  }
+
+  .detected-note {
+    font-size: 1.2rem;
+  }
+}

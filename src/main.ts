@@ -5,10 +5,9 @@ import {
   initializeInfiniteTerrain,
   updateInfiniteTerrain,
   getTerrainStats,
-  disposeInfiniteTerrain
+  disposeInfiniteTerrain,
 } from "../gen_terrain.ts";
 import { TuneDetector } from "../pitchDetector";
-
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
@@ -48,7 +47,7 @@ const music = new Audio("/glamour.m4a");
 let musicPlaying = false;
 music.loop = true;
 
-const hitSound = new Audio("/hit.m4a")
+const hitSound = new Audio("/hit.m4a");
 
 const TURN_SPEED = THREE.MathUtils.degToRad(360); // max deg/sec the player can turn
 let desiredFacing = Direction.CENTER;
@@ -271,11 +270,7 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
     playerRoot.position.addScaledVector(forwardLocal, MOVE_SPEED * dt);
 
     // Update infinite terrain based on player position
-    updateInfiniteTerrain(
-      playerRoot.position.x,
-      playerRoot.position.y,
-      camera as THREE.PerspectiveCamera
-    );
+    updateInfiniteTerrain(playerRoot.position.x, playerRoot.position.y, camera as THREE.PerspectiveCamera);
   }
 
   // Update enemies
@@ -298,7 +293,7 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
 
       let playerPos2 = new THREE.Vector3(playerPos);
       playerPos2.y += 15;
-      const dist2 = e.mesh.position.distanceTo(playerPos2)
+      const dist2 = e.mesh.position.distanceTo(playerPos2);
       if (dist <= e.radius + playerColliderRadius - 10 || dist2 <= e.radius) {
         hitSound.play();
         emitPlayerHit({
@@ -351,14 +346,7 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   const loadDistance = 4; // chunks to load around player
   const unloadDistance = 5; // chunks to unload beyond
 
-  initializeInfiniteTerrain(
-    mainScene,
-    camera,
-    chunkSize,
-    tileScale,
-    loadDistance,
-    unloadDistance
-  );
+  initializeInfiniteTerrain(mainScene, camera, chunkSize, tileScale, loadDistance, unloadDistance);
 
   let player = new Player(mainScene, camera);
   let facing = Direction.CENTER;
@@ -486,41 +474,55 @@ export function graphicsInit() {
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Content Loaded");
   graphicsInit();
-
 });
-
 
 const detector = new TuneDetector((note, freq) => {
   console.log(`Detected: ${note} (${freq.toFixed(2)} Hz)`);
 
-  // Example: map certain notes to actions
+  let action = "";
+
+  // Map notes to actions
   if (note.startsWith("C")) {
-    console.log("Move Forward");
+    action = "Move Forward";
     desiredFacing = Direction.CENTER;
   } else if (note.startsWith("D")) {
-    console.log("Turn Left");
+    action = "Turn Left";
     desiredFacing = Direction.LEFT;
     turnLeftHeld = true;
     setTimeout(() => {
       turnLeftHeld = false;
     }, 500);
   } else if (note.startsWith("E")) {
-    console.log("Turn Right");
+    action = "Turn Right";
     desiredFacing = Direction.RIGHT;
     turnRightHeld = true;
     setTimeout(() => {
       turnRightHeld = false;
     }, 500);
+  } else {
+    action = "No action";
+  }
+
+  // Update UI
+  if ((window as any).updateTuneDetectionUI) {
+    (window as any).updateTuneDetectionUI(note, action);
   }
 });
 
+// Start/stop detection with keyboard for demo purposes
 document.addEventListener("keydown", (e) => {
   if (e.key === "m") {
     console.log("🎤 Starting tune detection...");
     detector.start();
+    if ((window as any).setTuneDetectionStatus) {
+      (window as any).setTuneDetectionStatus(true);
+    }
   } else if (e.key === "x") {
     console.log("🛑 Stopping tune detection...");
     detector.stop();
+    if ((window as any).setTuneDetectionStatus) {
+      (window as any).setTuneDetectionStatus(false);
+    }
   }
 });
 
