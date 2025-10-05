@@ -38,6 +38,7 @@ export const PLAYER_SURVIVE_100M_EVENT = "playerSurvive100meteres";
 export const PLAYER_DIES_EVENT = "playerdies";
 
 const music = new Audio("/glamour.m4a");
+let musicPlaying = false;
 music.loop = true;
 
 const TURN_SPEED = THREE.MathUtils.degToRad(360); // max deg/sec the player can turn
@@ -534,6 +535,12 @@ export function graphicsInit() {
   console.log("Graphics initialized.");
   document.addEventListener("startgame", () => {
     console.log("startgame event received");
+
+    if (!musicPlaying) {
+      music.play();
+      musicPlaying = true;
+    }
+
     startGame(camera);
     console.log("Game started");
   });
