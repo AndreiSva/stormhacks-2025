@@ -7,6 +7,8 @@ import {
   getTerrainStats,
   disposeInfiniteTerrain
 } from "../gen_terrain.ts";
+import { TuneDetector } from "../pitchDetector";
+
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
@@ -484,6 +486,42 @@ export function graphicsInit() {
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Content Loaded");
   graphicsInit();
+
+});
+
+
+const detector = new TuneDetector((note, freq) => {
+  console.log(`Detected: ${note} (${freq.toFixed(2)} Hz)`);
+
+  // Example: map certain notes to actions
+  if (note.startsWith("C")) {
+    console.log("Move Forward");
+    desiredFacing = Direction.CENTER;
+  } else if (note.startsWith("D")) {
+    console.log("Turn Left");
+    desiredFacing = Direction.LEFT;
+    turnLeftHeld = true;
+    setTimeout(() => {
+      turnLeftHeld = false;
+    }, 500);
+  } else if (note.startsWith("E")) {
+    console.log("Turn Right");
+    desiredFacing = Direction.RIGHT;
+    turnRightHeld = true;
+    setTimeout(() => {
+      turnRightHeld = false;
+    }, 500);
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "m") {
+    console.log("🎤 Starting tune detection...");
+    detector.start();
+  } else if (e.key === "x") {
+    console.log("🛑 Stopping tune detection...");
+    detector.stop();
+  }
 });
 
 document.addEventListener(PLAYER_HIT_EVENT, (e: Event) => {
