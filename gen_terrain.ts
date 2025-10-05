@@ -1,241 +1,555 @@
-import * as THREE from "three";
-import * as noise from "noisejs";
+import * as THREE from 'three';
+import * as noise from 'noisejs';
+// @ts-ignore
+import Delaunator from 'https://cdn.skypack.dev/delaunator@5.0.0';
 
 // Create a single global noise instance with a fixed seed for consistency
-const globalNoiseInstance = new noise.Noise(12345); // Use fixed seed for reproducible terrain
+const globalNoiseInstance = new noise.Noise(12345);
 
-// Generate a 2D Perlin noise map
-export function generatePerlinNoiseMap(
-  xWidth: number,
-  yWidth: number,
-  scale: number,
-  offsetX: number,
-  offsetY: number
-): number[][] {
-  const map: number[][] = [];
+// Chunk management system
+interface ChunkData {
+  key: string;
+  meshGroup: THREE.Group;
+  noiseMap: number[][];
+  worldX: number;
+  worldY: number;
+  lastAccessTime: number;
+}
 
-  for (let i = 0; i < yWidth; i++) {
-    const row: number[] = [];
-    for (let j = 0; j < xWidth; j++) {
-      // Calculate absolute world position for this point
-      const worldX = offsetX + j * scale;
-      const worldY = offsetY + i * scale;
+class TerrainChunkManager {
+  private chunks: Map<string, ChunkData> = new Map();
+  private scene: THREE.Scene;
+  private chunkSize: number; // Number of tiles per chunk side
+  private tileScale: number; // Scale of each tile
+  private loadDistance: number; // Distance in chunks to load
+  private unloadDistance: number; // Distance in chunks to unload
+  private lastPlayerChunkX: number = NaN;
+  private lastPlayerChunkY: number = NaN;
+  private maxPointsPerChunk: number = 400; // Max sampled points for Delaunay
 
-      // Sample noise at world coordinates (divided by frequency factor)
-      const noiseFrequency = 20; // Adjust this to change terrain frequency
-      const x = worldX / noiseFrequency;
-      const y = worldY / noiseFrequency;
-
-      // Sample from the global noise field
-      const height = globalNoiseInstance.perlin2(x, y);
-      row.push(height);
-    }
-    map.push(row);
+  constructor(
+    scene: THREE.Scene,
+    chunkSize: number = 16,
+    tileScale: number = 5,
+    loadDistance: number = 3,
+    unloadDistance: number = 5
+  ) {
+    this.scene = scene;
+    this.chunkSize = chunkSize;
+    this.tileScale = tileScale;
+    this.loadDistance = loadDistance;
+    this.unloadDistance = unloadDistance;
   }
 
-  return map;
-}
-
-export function addTriangles(scene: THREE.Scene, triangles: Array<Array<THREE.Vector3>>) {
-  console.log("Adding triangles to the scene...");
-  triangles.forEach((triangle) => {
-    const a = triangle[0];
-    const b = triangle[1];
-    const c = triangle[2];
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute([a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z], 3)
-    );
-
-    geometry.computeVertexNormals();
-
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xff5533,
-      side: THREE.DoubleSide,
-      flatShading: true,
-    });
-
-    const triangleMesh = new THREE.Mesh(geometry, material);
-    scene.add(triangleMesh);
-  });
-}
-
-export function createMeshFromNoiseMap(
-  scene: THREE.Scene,
-  noiseMap: number[][],
-  scale: number,
-  offsetX: number,
-  offsetY: number
-): THREE.Group {
-  const triangles: Array<Array<THREE.Vector3>> = [];
-  const height = noiseMap.length;
-  const width = noiseMap[0].length;
-
-  console.log(`Creating mesh at offset (${offsetX}, ${offsetY}) with size ${width}x${height}`);
-
-  // Iterate over the grid to create triangles
-  for (let i = 0; i < height - 1; i++) {
-    for (let j = 0; j < width - 1; j++) {
-      // Calculate world positions
-      const x = offsetX + j * scale;
-      const y = offsetY + i * scale;
-
-      // Get heights from noise map
-      const z0 = noiseMap[i][j] * 10;
-      const z1 = noiseMap[i][j + 1] * 10;
-      const z2 = noiseMap[i + 1][j] * 10;
-      const z3 = noiseMap[i + 1][j + 1] * 10;
-
-      // Create vertices
-      const a = new THREE.Vector3(x, y, z0);
-      const b = new THREE.Vector3(x + scale, y, z1);
-      const c = new THREE.Vector3(x, y + scale, z2);
-      const d = new THREE.Vector3(x + scale, y + scale, z3);
-
-      // Two triangles per quad
-      triangles.push([a, b, c]);
-      triangles.push([b, d, c]);
-    }
+  // Convert world position to chunk coordinates
+  private worldToChunk(worldX: number, worldY: number): { chunkX: number; chunkY: number } {
+    const chunkWorldSize = this.chunkSize * this.tileScale;
+    return {
+      chunkX: Math.floor(worldX / chunkWorldSize),
+      chunkY: Math.floor(worldY / chunkWorldSize)
+    };
   }
 
-  // Create a group to hold all triangles for this tile
-  const tileGroup = new THREE.Group();
+  // Generate unique key for chunk
+  private getChunkKey(chunkX: number, chunkY: number): string {
+    return `${chunkX},${chunkY}`;
+  }
 
-  triangles.forEach((triangle) => {
-    const a = triangle[0];
-    const b = triangle[1];
-    const c = triangle[2];
+  // Generate a chunk at given chunk coordinates
+  private generateChunk(chunkX: number, chunkY: number, camera?: THREE.PerspectiveCamera): ChunkData {
+    const key = this.getChunkKey(chunkX, chunkY);
+    
+    // Calculate world offset for this chunk
+    const chunkWorldSize = this.chunkSize * this.tileScale;
+    const worldOffsetX = chunkX * chunkWorldSize;
+    const worldOffsetY = chunkY * chunkWorldSize;
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute([a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z], 3)
+    // Generate noise map for entire chunk (with extra padding for edge calculations)
+    const noiseMap = this.generatePerlinNoiseMap(
+      this.chunkSize + 1,
+      this.chunkSize + 1,
+      this.tileScale,
+      worldOffsetX,
+      worldOffsetY
     );
 
-    geometry.computeVertexNormals();
+    // Compute gradients
+    const gradients = this.computeGradientMagnitude(noiseMap);
 
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xff5533,
-      side: THREE.DoubleSide,
-      flatShading: true,
-    });
+    // Sample points based on gradient
+    const sampledPoints = this.samplePointsByGradient(
+      noiseMap,
+      gradients,
+      this.maxPointsPerChunk,
+      worldOffsetX,
+      worldOffsetY
+    );
 
-    const triangleMesh = new THREE.Mesh(geometry, material);
-    tileGroup.add(triangleMesh);
-  });
+    // Create mesh using Delaunay triangulation
+    const meshGroup = this.createMeshFromDelaunay(
+      sampledPoints,
+      worldOffsetX,
+      worldOffsetY,
+      chunkWorldSize
+    );
 
-  scene.add(tileGroup);
-  return tileGroup;
-}
+    const chunkData: ChunkData = {
+      key,
+      meshGroup,
+      noiseMap,
+      worldX: worldOffsetX,
+      worldY: worldOffsetY,
+      lastAccessTime: performance.now()
+    };
 
-export function generateAndRenderTerrain(
-  posX: number,
-  posY: number,
-  scale: number,
-  genDistance: number,
-  renderDistance: number,
-  scene: THREE.Scene,
-  camera?: THREE.PerspectiveCamera
-) {
-  const width = genDistance * 2 + 1;
-  const height = genDistance * 2 + 1;
+    return chunkData;
+  }
 
-  // Base tile dimensions (points per tile at highest detail)
-  const baseTileSize = 20; // Higher = more detail at close range
+  // Generate noise map
+  private generatePerlinNoiseMap(
+    width: number,
+    height: number,
+    scale: number,
+    offsetX: number,
+    offsetY: number
+  ): number[][] {
+    const map: number[][] = [];
+    const noiseFrequency = 20;
 
-  // Initialize arrays
-  const mapArray: number[][][] = [];
-  const renderArray: (THREE.Group | null)[][] = [];
+    for (let i = 0; i < height; i++) {
+      const row: number[] = [];
+      for (let j = 0; j < width; j++) {
+        const worldX = offsetX + j * scale;
+        const worldY = offsetY + i * scale;
+        const x = worldX / noiseFrequency;
+        const y = worldY / noiseFrequency;
+        const height = globalNoiseInstance.perlin2(x, y);
+        row.push(height);
+      }
+      map.push(row);
+    }
 
-  // Maximum distance for LOD calculation (diagonal distance across generation area)
-  const maxDistance = Math.sqrt(2) * (genDistance * (baseTileSize - 1) * scale);
-  enableFog(scene, renderDistance);
-  // Generate the terrain with LOD
-  for (let i = 0; i < width; i++) {
-    const mapRow: number[][] = [];
-    const renderRow: (THREE.Group | null)[] = [];
+    return map;
+  }
 
-    for (let j = 0; j < height; j++) {
-      const tileX = i - genDistance;
-      const tileY = j - genDistance;
+  // Compute gradient magnitude for a heightmap
+  private computeGradientMagnitude(heightmap: number[][]): number[][] {
+    const height = heightmap.length;
+    const width = heightmap[0].length;
+    const gradients: number[][] = [];
 
-      // Check if within generation distance
-      if (Math.abs(tileX) + Math.abs(tileY) <= genDistance) {
-        // Calculate world offset for this tile (using base tile size for positioning)
-        const worldOffsetX = posX + tileX * (baseTileSize - 1) * scale;
-        const worldOffsetY = posY + tileY * (baseTileSize - 1) * scale;
+    for (let i = 0; i < height; i++) {
+      const row: number[] = [];
+      for (let j = 0; j < width; j++) {
+        const dx = this.sobelX(heightmap, i, j, width, height);
+        const dy = this.sobelY(heightmap, i, j, width, height);
+        const magnitude = Math.sqrt(dx * dx + dy * dy);
+        row.push(magnitude);
+      }
+      gradients.push(row);
+    }
 
-        // Calculate distance from camera to tile center (if camera is provided)
-        let lodFactor = 1.0; // Default to full detail
-        if (camera) {
-          const tileCenterX = worldOffsetX + ((baseTileSize - 1) * scale) / 2;
-          const tileCenterY = worldOffsetY + ((baseTileSize - 1) * scale) / 2;
-          const tileDistance = camera.position.distanceTo(new THREE.Vector3(tileCenterX, tileCenterY, 0));
-          lodFactor = calculateLODFactor(tileDistance, maxDistance);
-        }
+    return gradients;
+  }
 
-        // Adjust tile size based on LOD (less vertices = lower detail)
-        const tileSize = Math.max(4, Math.floor(baseTileSize * lodFactor));
+  // Sobel operator for X direction
+  private sobelX(map: number[][], i: number, j: number, width: number, height: number): number {
+    const get = (y: number, x: number) => {
+      const cy = Math.max(0, Math.min(height - 1, y));
+      const cx = Math.max(0, Math.min(width - 1, x));
+      return map[cy][cx];
+    };
 
-        // Generate noise map for this tile with adjusted resolution
-        const noiseMap = generatePerlinNoiseMap(
-          tileSize,
-          tileSize,
-          (scale * (baseTileSize - 1)) / (tileSize - 1), // Adjust scale to maintain tile size
-          worldOffsetX,
-          worldOffsetY
-        );
-        mapRow.push(noiseMap);
+    return (
+      -get(i - 1, j - 1) - 2 * get(i, j - 1) - get(i + 1, j - 1) +
+      get(i - 1, j + 1) + 2 * get(i, j + 1) + get(i + 1, j + 1)
+    );
+  }
 
-        // Check if within render distance
-        if (Math.abs(tileX) + Math.abs(tileY) <= renderDistance) {
-          console.log(`Rendering tile at (${tileX}, ${tileY}) with LOD ${lodFactor.toFixed(2)} (${tileSize} points)`);
-          const terrainMesh = createMeshFromNoiseMap(
-            scene,
-            noiseMap,
-            (scale * (baseTileSize - 1)) / (tileSize - 1),
-            worldOffsetX,
-            worldOffsetY
-          );
-          renderRow.push(terrainMesh);
-        } else {
-          console.log(`Generated but not rendering tile at (${tileX}, ${tileY})`);
-          renderRow.push(null);
-        }
-      } else {
-        mapRow.push([]);
-        renderRow.push(null);
+  // Sobel operator for Y direction
+  private sobelY(map: number[][], i: number, j: number, width: number, height: number): number {
+    const get = (y: number, x: number) => {
+      const cy = Math.max(0, Math.min(height - 1, y));
+      const cx = Math.max(0, Math.min(width - 1, x));
+      return map[cy][cx];
+    };
+
+    return (
+      -get(i - 1, j - 1) - 2 * get(i - 1, j) - get(i - 1, j + 1) +
+      get(i + 1, j - 1) + 2 * get(i + 1, j) + get(i + 1, j + 1)
+    );
+  }
+
+  // Sample points based on gradient (more samples on steep areas)
+  private samplePointsByGradient(
+    noiseMap: number[][],
+    gradients: number[][],
+    maxPoints: number,
+    offsetX: number,
+    offsetY: number
+  ): { x: number; y: number; z: number }[] {
+    const height = noiseMap.length;
+    const width = noiseMap[0].length;
+    
+    // Normalize gradients
+    let maxGrad = 0;
+    for (let i = 0; i < height; i++) {
+      for (let j = 0; j < width; j++) {
+        maxGrad = Math.max(maxGrad, gradients[i][j]);
       }
     }
 
-    mapArray.push(mapRow);
-    renderArray.push(renderRow);
+    // Build probability map
+    const probMap: number[] = [];
+    const positions: { i: number; j: number }[] = [];
+    let totalProb = 0;
+
+    for (let i = 0; i < height; i++) {
+      for (let j = 0; j < width; j++) {
+        // Higher gradient = higher probability, with minimum baseline
+        const prob = maxGrad > 0 ? (gradients[i][j] / maxGrad) + 0.1 : 1;
+        probMap.push(prob);
+        positions.push({ i, j });
+        totalProb += prob;
+      }
+    }
+
+    const sampledPoints: { x: number; y: number; z: number }[] = [];
+    const sampledIndices = new Set<number>();
+
+    // Always include corner points for seamless boundaries
+    const corners = [
+      { i: 0, j: 0 },
+      { i: 0, j: width - 1 },
+      { i: height - 1, j: 0 },
+      { i: height - 1, j: width - 1 }
+    ];
+
+    for (const corner of corners) {
+      sampledPoints.push({
+        x: offsetX + corner.j * this.tileScale,
+        y: offsetY + corner.i * this.tileScale,
+        z: noiseMap[corner.i][corner.j] * 10
+      });
+      const idx = corner.i * width + corner.j;
+      sampledIndices.add(idx);
+    }
+
+    // Add edge points for better chunk boundaries
+    const edgeSpacing = Math.floor(Math.max(width, height) / 8);
+    for (let i = 0; i < height; i += edgeSpacing) {
+      if (i === 0 || i === height - 1) continue;
+      // Left edge
+      sampledPoints.push({
+        x: offsetX,
+        y: offsetY + i * this.tileScale,
+        z: noiseMap[i][0] * 10
+      });
+      sampledIndices.add(i * width);
+      // Right edge
+      sampledPoints.push({
+        x: offsetX + (width - 1) * this.tileScale,
+        y: offsetY + i * this.tileScale,
+        z: noiseMap[i][width - 1] * 10
+      });
+      sampledIndices.add(i * width + width - 1);
+    }
+    for (let j = 0; j < width; j += edgeSpacing) {
+      if (j === 0 || j === width - 1) continue;
+      // Top edge
+      sampledPoints.push({
+        x: offsetX + j * this.tileScale,
+        y: offsetY,
+        z: noiseMap[0][j] * 10
+      });
+      sampledIndices.add(j);
+      // Bottom edge
+      sampledPoints.push({
+        x: offsetX + j * this.tileScale,
+        y: offsetY + (height - 1) * this.tileScale,
+        z: noiseMap[height - 1][j] * 10
+      });
+      sampledIndices.add((height - 1) * width + j);
+    }
+
+    // Sample remaining points weighted by gradient
+    const actualMaxPoints = Math.min(maxPoints, probMap.length);
+    let attempts = 0;
+    const maxAttempts = actualMaxPoints * 3;
+
+    while (sampledPoints.length < actualMaxPoints && attempts < maxAttempts) {
+      attempts++;
+      const r = Math.random() * totalProb;
+      let cumulative = 0;
+      let selectedIdx = -1;
+
+      for (let idx = 0; idx < probMap.length; idx++) {
+        cumulative += probMap[idx];
+        if (r <= cumulative && !sampledIndices.has(idx)) {
+          selectedIdx = idx;
+          break;
+        }
+      }
+
+      if (selectedIdx >= 0) {
+        sampledIndices.add(selectedIdx);
+        const { i, j } = positions[selectedIdx];
+        sampledPoints.push({
+          x: offsetX + j * this.tileScale,
+          y: offsetY + i * this.tileScale,
+          z: noiseMap[i][j] * 10
+        });
+      }
+    }
+
+    return sampledPoints;
   }
 
-  return { mapArray, renderArray };
+  // Create mesh using Delaunay triangulation
+  private createMeshFromDelaunay(
+    points: { x: number; y: number; z: number }[],
+    offsetX: number,
+    offsetY: number,
+    chunkWorldSize: number
+  ): THREE.Group {
+    const group = new THREE.Group();
+
+    if (points.length < 3) {
+      console.warn('Not enough points for triangulation');
+      return group;
+    }
+
+    // Prepare coordinates for Delaunator (only x, y for 2D triangulation)
+    const coords: number[] = [];
+    points.forEach(p => {
+      coords.push(p.x, p.y);
+    });
+
+    // Perform Delaunay triangulation
+    const delaunay = Delaunator.from(coords.map((c, i) => 
+      i % 2 === 0 ? [coords[i], coords[i + 1]] : null
+    ).filter(Boolean) as number[][]);
+
+    // Build geometry from triangulation
+    const positions: number[] = [];
+    const indices: number[] = [];
+
+    // Add all vertices
+    points.forEach(p => {
+      positions.push(p.x, p.y, p.z);
+    });
+
+    // Add triangles
+    for (let i = 0; i < delaunay.triangles.length; i += 3) {
+      const i0 = delaunay.triangles[i];
+      const i1 = delaunay.triangles[i + 1];
+      const i2 = delaunay.triangles[i + 2];
+
+      // Optional: Filter out very large triangles (spanning chunk boundaries)
+      const p0 = points[i0];
+      const p1 = points[i1];
+      const p2 = points[i2];
+
+      const d01 = Math.hypot(p0.x - p1.x, p0.y - p1.y);
+      const d12 = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      const d20 = Math.hypot(p2.x - p0.x, p2.y - p0.y);
+
+      const maxEdge = chunkWorldSize * 0.5; // Filter out triangles with edges > half chunk size
+      if (d01 < maxEdge && d12 < maxEdge && d20 < maxEdge) {
+        indices.push(i0, i1, i2);
+      }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xff5533,
+      side: THREE.DoubleSide,
+      flatShading: true
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    group.add(mesh);
+
+    return group;
+  }
+
+  // Load chunk if not already loaded
+  private loadChunk(chunkX: number, chunkY: number, camera?: THREE.PerspectiveCamera): void {
+    const key = this.getChunkKey(chunkX, chunkY);
+    
+    if (this.chunks.has(key)) {
+      const chunk = this.chunks.get(key)!;
+      chunk.lastAccessTime = performance.now();
+      return;
+    }
+
+    console.log(`Loading chunk (${chunkX}, ${chunkY})`);
+    
+    const chunkData = this.generateChunk(chunkX, chunkY, camera);
+    this.chunks.set(key, chunkData);
+    this.scene.add(chunkData.meshGroup);
+  }
+
+  // Unload chunk
+  private unloadChunk(chunkX: number, chunkY: number): void {
+    const key = this.getChunkKey(chunkX, chunkY);
+    const chunk = this.chunks.get(key);
+    
+    if (!chunk) return;
+
+    console.log(`Unloading chunk (${chunkX}, ${chunkY})`);
+    
+    this.scene.remove(chunk.meshGroup);
+    
+    chunk.meshGroup.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.geometry.dispose();
+        if (obj.material instanceof THREE.Material) {
+          obj.material.dispose();
+        }
+      }
+    });
+
+    this.chunks.delete(key);
+  }
+
+  // Update terrain based on player position
+  update(playerX: number, playerY: number, camera?: THREE.PerspectiveCamera): void {
+    const { chunkX: playerChunkX, chunkY: playerChunkY } = this.worldToChunk(playerX, playerY);
+
+    if (playerChunkX === this.lastPlayerChunkX && playerChunkY === this.lastPlayerChunkY) {
+      return;
+    }
+
+    this.lastPlayerChunkX = playerChunkX;
+    this.lastPlayerChunkY = playerChunkY;
+
+    console.log(`Player in chunk (${playerChunkX}, ${playerChunkY})`);
+
+    // Load chunks in range
+    for (let dx = -this.loadDistance; dx <= this.loadDistance; dx++) {
+      for (let dy = -this.loadDistance; dy <= this.loadDistance; dy++) {
+        if (Math.abs(dx) + Math.abs(dy) <= this.loadDistance) {
+          this.loadChunk(playerChunkX + dx, playerChunkY + dy, camera);
+        }
+      }
+    }
+
+    // Unload chunks out of range
+    const chunksToUnload: string[] = [];
+    this.chunks.forEach((chunk, key) => {
+      const [chunkXStr, chunkYStr] = key.split(',');
+      const chunkX = parseInt(chunkXStr);
+      const chunkY = parseInt(chunkYStr);
+      
+      const dx = Math.abs(chunkX - playerChunkX);
+      const dy = Math.abs(chunkY - playerChunkY);
+      
+      if (dx + dy > this.unloadDistance) {
+        chunksToUnload.push(key);
+      }
+    });
+
+    chunksToUnload.forEach(key => {
+      const [chunkXStr, chunkYStr] = key.split(',');
+      this.unloadChunk(parseInt(chunkXStr), parseInt(chunkYStr));
+    });
+  }
+
+  // Get statistics
+  getStats(): { loadedChunks: number; totalVertices: number } {
+    let totalVertices = 0;
+    this.chunks.forEach(chunk => {
+      chunk.meshGroup.traverse(obj => {
+        if (obj instanceof THREE.Mesh && obj.geometry) {
+          const posAttr = obj.geometry.getAttribute('position');
+          if (posAttr) totalVertices += posAttr.count;
+        }
+      });
+    });
+
+    return {
+      loadedChunks: this.chunks.size,
+      totalVertices
+    };
+  }
+
+  // Clean up all chunks
+  dispose(): void {
+    this.chunks.forEach((chunk) => {
+      this.scene.remove(chunk.meshGroup);
+      chunk.meshGroup.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry.dispose();
+          if (obj.material instanceof THREE.Material) {
+            obj.material.dispose();
+          }
+        }
+      });
+    });
+    this.chunks.clear();
+  }
 }
 
-// Calculate LOD factor based on distance from camera
-// Returns a value between 0.2 (far/low detail) and 1.0 (close/high detail)
-function calculateLODFactor(distance: number, maxDistance: number): number {
-  // Normalize distance to [0, 1]
-  const normalizedDistance = Math.min(distance / maxDistance, 1);
-
-  // Inverse relationship: closer = high resolution, farther = low resolution
-  // Use a power function for smoother falloff
-  const falloff = Math.pow(1 - normalizedDistance, 2);
-
-  // Keep factor between 0.2 and 1.0
-  return Math.max(0.2, falloff);
-}
-export function enableFog(scene: THREE.Scene, renderDistance: number, fogColor: number = 0x87ceeb) {
-  // Optional: set default fog color to sky blue )
-  // Set the background color of the scene to match the fog color
+// Enable fog
+export function enableFog(
+  scene: THREE.Scene,
+  renderDistance: number,
+  fogColor: number = 0x87CEEB
+): void {
   scene.background = new THREE.Color(fogColor);
+  scene.fog = new THREE.Fog(fogColor, 1, renderDistance * 1);
+}
 
-  // Set the fog for the scene
-  // The fog will start at 1 unit and extend up to renderDistance * 1.5
-  scene.fog = new THREE.Fog(fogColor, 1, renderDistance * 30);
+// Create and manage terrain with infinite chunks
+let terrainManager: TerrainChunkManager | null = null;
+
+export function initializeInfiniteTerrain(
+  scene: THREE.Scene,
+  camera: THREE.PerspectiveCamera,
+  chunkSize: number = 16,
+  tileScale: number = 5,
+  loadDistance: number = 3,
+  unloadDistance: number = 5
+): TerrainChunkManager {
+  if (terrainManager) {
+    terrainManager.dispose();
+  }
+
+  terrainManager = new TerrainChunkManager(
+    scene,
+    chunkSize,
+    tileScale,
+    loadDistance,
+    unloadDistance
+  );
+
+  enableFog(scene, loadDistance * chunkSize * tileScale * 0.75);
+
+  return terrainManager;
+}
+
+export function updateInfiniteTerrain(
+  playerX: number,
+  playerY: number,
+  camera?: THREE.PerspectiveCamera
+): void {
+  if (terrainManager) {
+    terrainManager.update(playerX, playerY, camera);
+  }
+}
+
+export function getTerrainStats(): { loadedChunks: number; totalVertices: number } | null {
+  return terrainManager ? terrainManager.getStats() : null;
+}
+
+export function disposeInfiniteTerrain(): void {
+  if (terrainManager) {
+    terrainManager.dispose();
+    terrainManager = null;
+  }
 }
