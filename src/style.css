@@ -74,12 +74,14 @@ main {
 .nav-links li a:hover {
   color: #00d9ff;
   background: rgba(0, 217, 255, 0.1);
+}
 #app {
   width: 100%;
   height: 100%;
   position: relative;
   margin: 0 auto;
   text-align: center;
+  cursor: url('../public/eyes.png'), auto;
 }
 
 .nav-links li a.active {

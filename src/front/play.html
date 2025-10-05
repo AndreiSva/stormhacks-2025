@@ -3,32 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Play - Flight Sim</title>
+    <title>Play - Violin Flight</title>
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="play.css" />
+    <link rel="icon" type="image/svg+xml" href="../../public/logo.svg" />
   </head>
   <body class="play-body">
-    <!-- Header with Exit Button -->
+    <!-- Header -->
     <header class="header">
       <nav class="navbar">
         <div class="nav-brand">
-          <a href="/">Flight Sim</a>
+          <a href="/">Violin Flight</a>
         </div>
         <ul class="nav-links">
           <li><a href="/">Home</a></li>
           <li><a href="/src/front/about.html">About</a></li>
           <li><a href="/src/front/play.html" class="active">Play</a></li>
         </ul>
-        <a href="/"><button class="exit-game-btn">Exit Game</button></a>
       </nav>
     </header>
 
     <!-- Main Game Content -->
     <main class="play-container">
+      <div id="game-stats">
+        <div id="time">Time: 0s</div>
+        <div id="lives">Lives: 3</div>
+        <button class="restart-game-btn" onclick="window.location.href='/src/front/play.html'">Restart</button>
+        <button class="exit-game-btn" onclick="window.location.href='/'">End Game</button>
+      </div>
       <!-- This is where main.ts will inject the game -->
       <div id="app"></div>
     </main>
 
     <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/front/playUI.ts"></script>
   </body>
 </html>

@@ -1,0 +1,64 @@
+<!-- Violin Flight — gradient SVG logo (transparent background) -->
+<svg width="780" height="200" viewBox="0 0 780 200" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Violin Flight logo">
+  <!-- defs -->
+  <defs>
+    <!-- cyan → teal gradient like your headings -->
+    <linearGradient id="vfGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#46D9FF"></stop>   <!-- cyan -->
+      <stop offset="100%" stop-color="#28E0B8"></stop>  <!-- teal -->
+    </linearGradient>
+    <!-- subtle glow -->
+    <filter id="vfGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="blur"></feGaussianBlur>
+      <feMerge>
+        <feMergeNode in="blur"></feMergeNode>
+        <feMergeNode in="SourceGraphic"></feMergeNode>
+      </feMerge>
+    </filter>
+    <!-- reusable stroke style -->
+    <style>
+      .s { stroke:url(#vfGrad); stroke-width:6; stroke-linecap:round; stroke-linejoin:round; }
+      .f { fill:url(#vfGrad); }
+      .t { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+           font-weight: 800; font-size: 64px; letter-spacing: 1px; }
+      /* Optional: dark mode friendly when placed on #0B1020 */
+    </style>
+  </defs>
+
+  <!-- mark: stylized violin with wings -->
+  <g transform="translate(20,20)" filter="url(#vfGlow)">
+    <!-- body -->
+    <path class="s" fill="none" d="M120,60
+             c-22,-12 -22,-48 0,-60
+             c22,12 22,48 0,60
+             M120,60
+             c22,12 22,48 0,60
+             c-22,-12 -22,-48 0,-60"></path>
+    <!-- top & bottom plates -->
+    <ellipse cx="120" cy="30" rx="30" ry="18" class="s" fill="none"></ellipse>
+    <ellipse cx="120" cy="90" rx="30" ry="18" class="s" fill="none"></ellipse>
+    <!-- neck & head -->
+    <line x1="150" y1="20" x2="215" y2="8" class="s"></line>
+    <circle cx="220" cy="7" r="8" class="f"></circle>
+    <!-- strings -->
+    <line x1="140" y1="22" x2="210" y2="9" class="s" stroke-width="2"></line>
+    <line x1="138" y1="26" x2="208" y2="13" class="s" stroke-width="2"></line>
+    <line x1="136" y1="30" x2="206" y2="17" class="s" stroke-width="2"></line>
+    <line x1="134" y1="34" x2="204" y2="21" class="s" stroke-width="2"></line>
+    <!-- simple f-holes -->
+    <path d="M98,58 q-6,6 0,12" class="s" fill="none" stroke-width="3"></path>
+    <path d="M142,58 q6,6 0,12" class="s" fill="none" stroke-width="3"></path>
+    <!-- wings -->
+    <path d="M65,50 l-45,12 l45,12 q18-8 0-24z" class="s" fill="none"></path>
+    <path d="M175,50 l45,12 l-45,12 q-18-8 0-24z" class="s" fill="none"></path>
+  </g>
+
+  <!-- wordmark -->
+  <g transform="translate(280,115)">
+    <text class="t f">VIOLIN FLIGHT</text>
+    <!-- tagline (optional) -->
+    <text x="0" y="36" font-size="18" fill="#8BDDE0" font-weight="500" style="letter-spacing:.3px">
+      Take Flight • Defy Gravity
+    </text>
+  </g>
+</svg>
