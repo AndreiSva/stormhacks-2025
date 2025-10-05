@@ -23,7 +23,13 @@ const clock = new THREE.Clock(); // for smooth dt-based motion
 
 let cameraRig: THREE.Group | null = null;
 
-let currentlyFacing = Direction.CENTER;
+let playerRoot: THREE.Group | null = null; // moves & turns; true heading
+const MOVE_SPEED = 8;                       // units per second, constant forward
+const TURN_RATE  = THREE.MathUtils.degToRad(180); // heading turn rate (deg/sec)
+
+// input state for continuous turning
+let turnLeftHeld  = false;
+let turnRightHeld = false;
 
 export let lives = NUM_LIVES;
 
@@ -33,6 +39,27 @@ export const PLAYER_DIES_EVENT = "playerdies";
 
 const music = new Audio('/glamour.m4a');
 music.loop = true;
+
+const TURN_SPEED = THREE.MathUtils.degToRad(360); // max deg/sec the player can turn
+let desiredFacing = Direction.CENTER;
+
+function normalizeAngle(a: number) {
+  // wrap to [-PI, PI)
+  a = (a + Math.PI) % (Math.PI * 2);
+  if (a < 0) a += Math.PI * 2;
+  return a - Math.PI;
+}
+function shortestAngleDelta(from: number, to: number) {
+  const a = normalizeAngle(to) - normalizeAngle(from);
+  if (a > Math.PI) return a - Math.PI * 2;
+  if (a < -Math.PI) return a + Math.PI * 2;
+  return a;
+}
+function yawForFacing(face: string) {
+  if (face === Direction.LEFT)  return -Math.PI / 4;
+  if (face === Direction.RIGHT) return  Math.PI / 4;
+  return 0; // CENTER
+}
 
 function emitPlayerHit(detail: any) {
   document.dispatchEvent(new CustomEvent(PLAYER_HIT_EVENT, { detail }));
@@ -233,40 +260,48 @@ class Player {
 
         // HELP ME OH SO HELP ME GOD WHAT THE HELL IS THIS CODE WHAT THE HELL
 
-        // create a pivot at the original center and parent the model to it
+        // create the hierarchy:
+        // playerRoot (moves & rotates actual heading)
+        //   └─ modelPivot (keeps visual yaw/lean)
+        //        └─ gltf root
+        playerRoot = new THREE.Group();
+        scene.add(playerRoot);
+        playerRoot.position.z = 10.0;
+
         modelPivot = new THREE.Group();
-        modelPivot.position.copy(center);
+        playerRoot.add(modelPivot);
+
+        // shift model so its center sits at pivot origin
+        {
+          const box = new THREE.Box3().setFromObject(root);
+          let center = box.getCenter(new THREE.Vector3());
+        }
+        root.position.sub(center);
+
+        // add the mesh
         modelPivot.add(root);
+
+        // compute a reasonable collider radius
         const tmpBox = new THREE.Box3().setFromObject(root);
         const tmpSphere = tmpBox.getBoundingSphere(new THREE.Sphere());
-        // Sphere center is in world coords now; we only need the radius
-        playerColliderRadius = Math.max(0.5, tmpSphere.radius); // guard tiny models
+        playerColliderRadius = Math.max(0.5, tmpSphere.radius);
         playerLoaded = true;
-        scene.add(modelPivot);
 
         if (camera && camera instanceof THREE.PerspectiveCamera) {
-          // Make a rig that's parented to the player pivot.
           cameraRig = new THREE.Group();
-          modelPivot.add(cameraRig);
+          // IMPORTANT: rig follows the true heading on playerRoot, not modelPivot
+          playerRoot.add(cameraRig);
 
-          // Put the rig at the pivot so camera coordinates are local to the violin.
           cameraRig.position.set(0, 0, 0);
-
-          // Parent the camera under the rig and set a nice local offset.
-          // (z > 0 means "behind" the player if the player faces -Z; tweak to taste)
           cameraRig.add(camera);
-          camera.position.set(0, 1.2, 3);
 
-          // Reasonable clip planes for a moderately sized scene
+          // a nice offset behind/above the player
+          camera.position.set(0, -20.0, 20.0);
           camera.near = 0.1;
-          camera.far = 1000;
+          camera.far  = 1000;
           camera.updateProjectionMatrix();
 
-          // Look at the player pivot's local origin (since camera is now a child).
-          camera.lookAt(0, 0, 0);
-
-          // Optional tilt for a slightly top-down feel
-          camera.rotation.x = THREE.MathUtils.degToRad(35);
+          camera.rotation.x = THREE.MathUtils.degToRad(50);
         }
       },
       (xhr) => {
@@ -286,17 +321,35 @@ export function setCurrentScene(scene: THREE.Scene) {
 
 function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   const dt = clock.getDelta();
+
+  //
+  // 1) Update visual yaw on the child (modelPivot) — this is the lean/look
+  //
   if (modelPivot) {
-    modelPivot.position.x = modelPivot.position.x + Math.sin(Date.now() * 0.001) * 0.05;
-
-    if (currentlyFacing == Direction.RIGHT && modelPivot.position.x < 20) {
-      modelPivot.position.x += 10 * dt;
-    }
-
-    if (currentlyFacing == Direction.LEFT && modelPivot.position.x > -20) {
-      modelPivot.position.x -= 10 * dt;
-    }
+    const targetYaw = yawForFacing(desiredFacing);
+    const curYaw = modelPivot.rotation.y;
+    const delta = shortestAngleDelta(curYaw, targetYaw);
+    const maxStep = TURN_SPEED * dt;
+    const step = THREE.MathUtils.clamp(delta, -maxStep, maxStep);
+    modelPivot.rotation.y = normalizeAngle(curYaw + step);
   }
+
+  //
+  // 2) Update true heading on the parent (playerRoot) and advance forward constantly
+  //
+  if (playerRoot) {
+    let turnInput = 0;
+    if (turnLeftHeld)  turnInput -= 1;
+    if (turnRightHeld) turnInput += 1;
+
+    playerRoot.rotation.z = normalizeAngle(playerRoot.rotation.z + turnInput * TURN_RATE * dt);
+
+    // Move in the direction the player is facing
+    const forwardLocal = new THREE.Vector3(0, 1, 0); // local forward
+    forwardLocal.applyQuaternion(playerRoot.quaternion); // rotate by current facing
+    playerRoot.position.addScaledVector(forwardLocal, MOVE_SPEED * dt);
+  }
+
   // Update enemies
   for (let i = enemies.length - 1; i >= 0; i--) {
     const keep = enemies[i].update(dt);
@@ -307,8 +360,9 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   }
 
   // Collision: enemies vs player
-  if (playerLoaded && modelPivot) {
+  if (playerLoaded && playerRoot && modelPivot) {
     const playerPos = new THREE.Vector3();
+    (playerRoot ?? modelPivot)!.getWorldPosition(playerPos);
     modelPivot.getWorldPosition(playerPos);
 
     for (let i = enemies.length - 1; i >= 0; i--) {
@@ -377,42 +431,25 @@ export function startGame(camera: THREE.PerspectiveCamera) {
 
   let facing = Direction.CENTER;
   document.addEventListener("keydown", (e) => {
-    if (e.key === "a" || e.key === "ArrowLeft") {
-      if (facing != Direction.LEFT) {
-        modelPivot!.rotation.y = -Math.PI / 4;
-      }
-      facing = Direction.LEFT;
-    }
-
-    if (e.key === "d" || e.key === "ArrowRight") {
-      if (facing != Direction.RIGHT) {
-        modelPivot!.rotation.y = Math.PI / 4;
-      }
-      facing = Direction.RIGHT;
-    }
-
-    if (e.key === "s" || e.key === "ArrowDown") {
-      if (facing != Direction.CENTER) {
-        modelPivot!.rotation.y = 0;
-      }
-      facing = Direction.CENTER;
-    }
-
-    const surviveHandle = setInterval(() => {
-      emitPlayerSurvive100m({
-        time: performance.now(),
-      });
-    }, 1000);
-
-    currentlyFacing = facing;
+    if (e.key === "a" || e.key === "ArrowLeft")  desiredFacing = Direction.LEFT;
+    if (e.key === "d" || e.key === "ArrowRight") desiredFacing = Direction.RIGHT;
+    if (e.key === "s" || e.key === "ArrowDown")  desiredFacing = Direction.CENTER;
   });
 
+  const surviveHandle = setInterval(() => {
+    emitPlayerSurvive100m({
+      time: performance.now(),
+    });
+  }, 1000);
+
   const spawnHandle = setInterval(() => {
-    if (!modelPivot) return; // wait for GLTF to finish
+    const targetForEnemies = playerRoot ?? modelPivot;  // fallback if load not done
+    if (!targetForEnemies) return;
+
     enemies.push(
       Enemie.spawnFromAboveY({
         scene: mainScene,
-        target: modelPivot!,
+        target: targetForEnemies,
         yMin: 20,
         yMax: 30,
         xSpread: 32,
@@ -426,6 +463,23 @@ export function startGame(camera: THREE.PerspectiveCamera) {
       e?.dispose();
     }
   }, 1500); // faster cadence feels better when they come in lanes
+
+  document.addEventListener("keydown", (e) => {
+    // visual yaw (lean) — unchanged semantics
+    if (e.key === "a" || e.key === "ArrowLeft")  { desiredFacing = Direction.LEFT;  turnLeftHeld = true; }
+    if (e.key === "d" || e.key === "ArrowRight") { desiredFacing = Direction.RIGHT; turnRightHeld = true; }
+    if (e.key === "s" || e.key === "ArrowDown")  { desiredFacing = Direction.CENTER; }
+  });
+
+  document.addEventListener("keyup", (e) => {
+    if (e.key === "a" || e.key === "ArrowLeft")  turnLeftHeld = false;
+    if (e.key === "d" || e.key === "ArrowRight") turnRightHeld = false;
+  });
+
+  document.addEventListener("keyup", () => {
+    desiredFacing = Direction.CENTER;
+  })
+
 }
 
 
@@ -449,11 +503,6 @@ export function graphicsInit() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   appDiv.appendChild(renderer.domElement);
-
-  document.addEventListener('on', () => {
-    startMusic().play();
-  });
-
 
   function resizeToApp() {
     const rect = appDiv.getBoundingClientRect();
