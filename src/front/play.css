@@ -63,13 +63,13 @@ body.play-body .navbar {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: 0;
   overflow: hidden;
 }
 
 #app {
   width: 100%;
-  max-width: 1400px;
+  max-width: 1600px;
   height: 100%;
   display: block;
   position: relative;
@@ -77,6 +77,8 @@ body.play-body .navbar {
   border-radius: 8px;
   overflow: hidden;
   background: #000;
+  margin: 0 auto;
+  padding: 0%;
 }
 
 #app canvas {
