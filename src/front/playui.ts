@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (startBtn) {
       startBtn.style.display = "block";
     }
-  }, 2000);
+  }, 1500);
 
   if (startBtn && loadingScreen && gameContainer) {
     startBtn.addEventListener("click", () => {
@@ -58,7 +58,46 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// Rest of the event listeners remain the same...
+// Function to show game over modal
+function showGameOverModal(finalTime: number) {
+  const modal = document.getElementById("game-over-modal");
+  const finalTimeElement = document.getElementById("final-time");
+  const gameContainer = document.getElementById("game-container");
+
+  if (modal && finalTimeElement) {
+    finalTimeElement.textContent = `${finalTime}s`;
+
+    if (gameContainer) {
+      gameContainer.style.transition = "opacity 0.4s ease";
+      gameContainer.style.opacity = "0";
+
+      // Wait for fade to complete, then hide and show modal
+      setTimeout(() => {
+        gameContainer.style.display = "none";
+        modal.style.display = "flex";
+      }, 400);
+    } else {
+      // If gameContainer doesn't exist, just show modal immediately
+      modal.style.display = "flex";
+    }
+  }
+}
+
+// Function to handle player death
+function handlePlayerDeath(time: number) {
+  const elapsedSeconds = Math.floor((time - gameStartTime) / 1000);
+
+  // Show modal instead of alert
+  setTimeout(() => {
+    showGameOverModal(elapsedSeconds);
+  }, 100);
+}
+
+// Make endGame available globally
+(window as any).endGame = function () {
+  // Call the function directly instead of dispatching event
+  handlePlayerDeath(performance.now());
+};
 
 document.addEventListener("playerhit", (e: Event) => {
   const detail = (e as CustomEvent).detail;
@@ -79,6 +118,5 @@ document.addEventListener("playerSurvive100meteres", (e: Event) => {
 
 document.addEventListener("playerdies", (e: Event) => {
   const detail = (e as CustomEvent).detail;
-  const elapsedSeconds = Math.floor((detail.time - gameStartTime) / 1000);
-  alert(`Game Over! Time: ${elapsedSeconds}s`);
+  handlePlayerDeath(detail.time);
 });

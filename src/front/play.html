@@ -58,13 +58,45 @@
         <button id="start-game-btn" class="start-btn" style="display: none">Start Flight</button>
       </div>
 
+      <!-- Game Over Modal (hidden initially) -->
+      <div id="game-over-modal" class="game-over-modal" style="display: none">
+        <div class="game-over-content">
+          <div class="game-over-icon">💀</div>
+          <h2 class="game-over-title">Game Over</h2>
+          <div class="game-over-stats">
+            <div class="stat-item">
+              <span class="stat-label">Time Survived</span>
+              <span class="stat-value" id="final-time">0s</span>
+            </div>
+          </div>
+          <div class="game-over-actions">
+            <button class="modal-btn restart-btn" onclick="window.location.href='/src/front/play.html'">
+              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                <path
+                  d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+                />
+              </svg>
+              Play Again
+            </button>
+            <button class="modal-btn exit-btn" onclick="window.location.href='/'">
+              <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                <path
+                  d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"
+                />
+              </svg>
+              Exit to Home
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Game Container (hidden initially) -->
       <div id="game-container" class="game-container" style="display: none">
         <div id="game-stats">
           <div id="time">Time: 0s</div>
           <div id="lives">Lives: 3</div>
           <button class="restart-game-btn" onclick="window.location.href='/src/front/play.html'">Restart</button>
-          <button class="exit-game-btn" onclick="window.location.href='/'">End Game</button>
+          <button class="exit-game-btn" onclick="endGame()">End Game</button>
         </div>
         <div id="app"></div>
       </div>
