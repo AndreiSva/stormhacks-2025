@@ -20,7 +20,7 @@ const Direction = {
 const enemies: Enemie[] = [];
 const clock = new THREE.Clock(); // for smooth dt-based motion
 
-
+let currentlyFacing = Direction.CENTER;
 
 class Enemie {
   scene: THREE.Scene;
@@ -248,7 +248,15 @@ export function setCurrentScene(scene: THREE.Scene) {
 function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   const dt = clock.getDelta();
   if (modelPivot) {
-    modelPivot.position.x = Math.sin(Date.now() * 0.001) * 2;
+    modelPivot.position.x = modelPivot.position.x + Math.sin(Date.now() * 0.001) * 0.05;
+
+    if (currentlyFacing == Direction.RIGHT) {
+      modelPivot.position.x += 10 * dt;
+    }
+
+    if (currentlyFacing == Direction.LEFT) {
+      modelPivot.position.x -= 10 * dt;
+    }
   }
   // Update enemies
   for (let i = enemies.length - 1; i >= 0; i--) {
@@ -330,6 +338,8 @@ export function startGame(camera: THREE.PerspectiveCamera) {
       }
       facing = Direction.CENTER;
     }
+
+    currentlyFacing = facing;
   });
 
   const spawnHandle = setInterval(() => {
