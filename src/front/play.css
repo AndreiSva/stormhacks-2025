@@ -102,8 +102,6 @@ body.play-body {
 /* Restart button in HUD */
 #game-stats .restart-game-btn {
   padding: 0.6rem 1.5rem;
-  padding-right: 0.5 rem;
-  margin-right: 0.5 rem;
   background: linear-gradient(135deg, #10b981, #059669);
   color: #fff;
   border: 2px solid rgba(255, 255, 255, 0.2);
