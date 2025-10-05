@@ -5,9 +5,17 @@ import { generatePerlinNoiseMap, createMeshFromNoiseMap } from '../gen_terrain.t
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
+mainScene.background = new THREE.Color(0xc91aaf);
+
 let currentScene = mainScene;
 let isGraphicsInitialized: boolean = false;
 let modelPivot: THREE.Group | null = null;
+
+const Direction = {
+  LEFT: "LEFT",
+  CENTER: "CENTER",
+  RIGHT: "RIGHT"
+};
 
 class Player {
   constructor(scene: THREE.Scene, camera?: THREE.PerspectiveCamera) {
@@ -114,18 +122,12 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   const width = 100;  // Width of the terrain grid
   const height = 100; // Height of the terrain grid
   const scale = 5;    // Scale of the terrain (controls smoothness)
-  
+
   const noiseMap = generatePerlinNoiseMap(width, height, scale);
   // Create terrain mesh from the noise map and add it to the scene
   createMeshFromNoiseMap(mainScene, noiseMap, width, height, scale);
 
   let player = new Player(mainScene, camera);
-
-  const Direction = {
-    LEFT: "LEFT",
-    CENTER: "CENTER",
-    RIGHT: "RIGHT"
-  };
 
   let facing = Direction.CENTER;
   document.addEventListener("keydown", (e) => {
@@ -164,26 +166,38 @@ export function graphicsInit() {
   dir.castShadow = true;
   mainScene.add(dir);
 
-  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  // Use temporary aspect; we’ll immediately update it from appDiv’s rect.
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
   camera.position.set(0, 1.2, 3);
+  camera.rotation.x = Math.PI / 6;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  appDiv.appendChild(renderer.domElement);
+
+  function resizeToApp() {
+    const rect = appDiv.getBoundingClientRect();
+    const w = Math.max(1, Math.floor(rect.width));
+    const h = Math.max(1, Math.floor(rect.height));
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    // Pass false so Three.js doesn't set canvas CSS size (we control it by parent)
+    renderer.setSize(w, h, false);
+  }
+
+  // Initial sizing
+  resizeToApp();
+
+  // React to element resizes (layout, flex, grid, sidebars, etc.)
+  const ro = new ResizeObserver(resizeToApp);
+  ro.observe(appDiv);
 
   renderer.setAnimationLoop(() => { render(renderer, camera) });
-  appDiv.appendChild(renderer.domElement);
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
 
   isGraphicsInitialized = true;
   startGame(camera);
 }
-
 
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Content Loaded");

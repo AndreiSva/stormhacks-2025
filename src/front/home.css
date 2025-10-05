@@ -93,7 +93,7 @@
 
 .controls-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
 }
 
@@ -134,12 +134,21 @@
 
 /* CTA Button Enhancement for Home */
 .hero-content .cta-button {
-  margin-top: 2rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.8rem;
-  font-size: 1.2rem;
-  padding: 1.2rem 3rem;
+  padding: 0.6rem 1.5rem;
+  background: rgb(99, 32, 131);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  font-family: inherit;
+  margin-left: auto;
+}
+
+.hero-content .cta-button:hover {
+  transform: scale(1.1);
 }
 
 .hero-content .cta-button svg {
