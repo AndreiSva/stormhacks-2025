@@ -68,9 +68,9 @@ body.play-body .navbar {
 }
 
 #app {
-  width: 90%;
+  width: 100%;
   max-width: 1400px;
-  height: 85%;
+  height: 100%;
   display: block;
   position: relative;
   border: 3px solid #ffffff;
