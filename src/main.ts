@@ -42,7 +42,7 @@ class Enemie {
     this.speed = opts.speed ?? 5.0; // <-- respect provided speed
     this.velocity = opts.velocity?.clone()?.normalize() ?? new THREE.Vector3(0, -1, 0); // default +Y
 
-    const r = 3;
+    const r = 2;
     const geom = new THREE.SphereGeometry(r, 16, 16);
     const mat  = new THREE.MeshStandardMaterial({
       color: 0xffeb3b,
@@ -337,8 +337,8 @@ export function startGame(camera: THREE.PerspectiveCamera) {
     enemies.push(Enemie.spawnFromAboveY({
       scene: mainScene,
       target: modelPivot!,
-      yMin: 18,
-      yMax: 36,
+      yMin: 20,
+      yMax: 30,
       xSpread: 32,
       zSpread: 0,
       speed: 2.2
