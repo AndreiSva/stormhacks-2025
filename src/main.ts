@@ -33,7 +33,7 @@ class Player {
 
         // 1) center the pivot at the model's bbox center
         const box = new THREE.Box3().setFromObject(root);
-        const center = box.getCenter(new THREE.Vector3());
+        let center = box.getCenter(new THREE.Vector3());
 
         // shift the model so its center sits at the pivot origin
         root.position.sub(center);
@@ -44,8 +44,6 @@ class Player {
         modelPivot.add(root);
         scene.add(modelPivot);
 
-        modelPivot.rotation.x = -(Math.PI / 2 - Math.PI / 4);
-
         if (camera && camera instanceof THREE.PerspectiveCamera) {
           const box = new THREE.Box3().setFromObject(root);
           const size = box.getSize(new THREE.Vector3()).length();
@@ -54,10 +52,12 @@ class Player {
           const fitDist = size / (2 * Math.tan((camera.fov * Math.PI) / 360));
           const dir = new THREE.Vector3(0, 0, 1);
           camera.position.copy(center.clone().add(dir.multiplyScalar(fitDist * 1.2)));
+          camera.position.y -= 20;
           camera.near = size / 100;
           camera.far = size * 10;
           camera.updateProjectionMatrix();
           camera.lookAt(center);
+          camera.rotation.x = THREE.MathUtils.degToRad(35);
         }
       },
       (xhr) => {
@@ -168,7 +168,6 @@ export function graphicsInit() {
   // Use temporary aspect; we’ll immediately update it from appDiv’s rect.
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
   camera.position.set(0, 1.2, 3);
-  camera.rotation.x = Math.PI / 6;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
