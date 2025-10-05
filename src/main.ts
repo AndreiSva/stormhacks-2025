@@ -1,6 +1,7 @@
 import './style.css'
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { generatePerlinNoiseMap, createMeshFromNoiseMap } from '../gen_terrain.ts';
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
@@ -108,6 +109,14 @@ export function startGame(camera: THREE.PerspectiveCamera) {
     console.log("startGame() needs graphics initialized");
     return;
   }
+  // Generate Perlin noise map
+  const width = 100;  // Width of the terrain grid
+  const height = 100; // Height of the terrain grid
+  const scale = 5;    // Scale of the terrain (controls smoothness)
+  
+  const noiseMap = generatePerlinNoiseMap(width, height, scale);
+  // Create terrain mesh from the noise map and add it to the scene
+  createMeshFromNoiseMap(mainScene, noiseMap, width, height, scale);
 
   let player = new Player(mainScene, camera);
 
