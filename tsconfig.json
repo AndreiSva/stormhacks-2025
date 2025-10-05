@@ -21,7 +21,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    "allowSyntheticDefaultImports": true
+      "allowSyntheticDefaultImports": true,
+      "noEmitOnError": false,
   },
   "include": ["src"]
 }
