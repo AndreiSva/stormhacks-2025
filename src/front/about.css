@@ -98,11 +98,6 @@
   margin-top: 0.5rem;
 }
 
-.about-cta {
-  text-align: center;
-  margin-top: 3rem;
-}
-
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .about-main {
