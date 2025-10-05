@@ -339,8 +339,8 @@ export function startGame(camera: THREE.PerspectiveCamera) {
       target: modelPivot!,
       yMin: 18,
       yMax: 36,
-      xSpread: 8,
-      zSpread: 8,
+      xSpread: 32,
+      zSpread: 0,
       speed: 2.2
     }));
 
