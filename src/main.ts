@@ -1,11 +1,12 @@
-import './style.css'
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { generatePerlinNoiseMap, createMeshFromNoiseMap } from '../gen_terrain.ts';
+import "./style.css";
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { generatePerlinNoiseMap, createMeshFromNoiseMap } from "../gen_terrain.ts";
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
 mainScene.background = new THREE.Color(0xc91aaf);
+const NUM_LIVES = 3;
 
 let currentScene = mainScene;
 let isGraphicsInitialized: boolean = false;
@@ -14,7 +15,7 @@ let modelPivot: THREE.Group | null = null;
 const Direction = {
   LEFT: "LEFT",
   CENTER: "CENTER",
-  RIGHT: "RIGHT"
+  RIGHT: "RIGHT",
 };
 
 const enemies: Enemie[] = [];
@@ -22,10 +23,11 @@ const clock = new THREE.Clock(); // for smooth dt-based motion
 
 let currentlyFacing = Direction.CENTER;
 
-export let lives = 10;
+export let lives = NUM_LIVES;
 
 export const PLAYER_HIT_EVENT = "playerhit";
 export const PLAYER_SURVIVE_100M_EVENT = "playerSurvive100meteres";
+export const PLAYER_DIES_EVENT = "playerdies";
 
 function emitPlayerHit(detail: any) {
   document.dispatchEvent(new CustomEvent(PLAYER_HIT_EVENT, { detail }));
@@ -33,24 +35,27 @@ function emitPlayerHit(detail: any) {
 function emitPlayerSurvive100m(detail: any) {
   document.dispatchEvent(new CustomEvent(PLAYER_SURVIVE_100M_EVENT, { detail }));
 }
+function emitPlayerDies(detail: any) {
+  document.dispatchEvent(new CustomEvent(PLAYER_DIES_EVENT, { detail }));
+}
 
-let playerColliderRadius = 0.1;    // will be updated once model loads
-let playerLoaded = false;          // becomes true after GLTF finishes
+let playerColliderRadius = 0.1; // will be updated once model loads
+let playerLoaded = false; // becomes true after GLTF finishes
 
 class Enemie {
   scene: THREE.Scene;
   target: THREE.Object3D;
   mesh: THREE.Mesh;
   speed: number;
-  velocity: THREE.Vector3
+  velocity: THREE.Vector3;
   radius: number;
 
   constructor(opts: {
-    scene: THREE.Scene,
-    target: THREE.Object3D,
-    position?: THREE.Vector3,
-    speed?: number,
-    velocity?: THREE.Vector3
+    scene: THREE.Scene;
+    target: THREE.Object3D;
+    position?: THREE.Vector3;
+    speed?: number;
+    velocity?: THREE.Vector3;
   }) {
     const { scene, target } = opts;
     this.scene = scene;
@@ -60,11 +65,11 @@ class Enemie {
 
     const r = 2;
     const geom = new THREE.SphereGeometry(r, 16, 16);
-    const mat  = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshStandardMaterial({
       color: 0xffeb3b,
       emissive: 0x2b2500,
       metalness: 0.1,
-      roughness: 0.6
+      roughness: 0.6,
     });
 
     this.mesh = new THREE.Mesh(geom, mat);
@@ -89,7 +94,7 @@ class Enemie {
     // Cull after it has passed the player by 10 units in its travel direction
     const relY = this.mesh.position.y - playerPos.y;
     if (this.velocity.y < 0 && relY < -50) return false; // moving down, passed below
-    if (this.velocity.y > 0 && relY > 50)  return false; // moving up, passed above
+    if (this.velocity.y > 0 && relY > 50) return false; // moving up, passed above
 
     if (this.mesh.position.lengthSq() > 1e6) return false; // safety
     return true;
@@ -102,13 +107,13 @@ class Enemie {
   }
 
   static spawnFromNegativeZ(opts: {
-    scene: THREE.Scene,
-    target: THREE.Object3D,
-    zMin?: number,
-    zMax?: number,
-    xSpread?: number,
-    y?: number,
-    speed?: number
+    scene: THREE.Scene;
+    target: THREE.Object3D;
+    zMin?: number;
+    zMax?: number;
+    xSpread?: number;
+    y?: number;
+    speed?: number;
   }): Enemie {
     const zMin = opts.zMin ?? 20;
     const zMax = opts.zMax ?? 40;
@@ -130,18 +135,18 @@ class Enemie {
       scene: opts.scene,
       target: opts.target,
       position: pos,
-      speed: opts.speed ?? 2.2
+      speed: opts.speed ?? 2.2,
     });
   }
 
   static spawnFromNegativeY(opts: {
-    scene: THREE.Scene,
-    target: THREE.Object3D,
-    yMin?: number,       // how far below to start (near)
-    yMax?: number,       // how far below to start (far)
-    xSpread?: number,    // +/- range around target.x
-    zSpread?: number,    // +/- range around target.z
-    speed?: number
+    scene: THREE.Scene;
+    target: THREE.Object3D;
+    yMin?: number; // how far below to start (near)
+    yMax?: number; // how far below to start (far)
+    xSpread?: number; // +/- range around target.x
+    zSpread?: number; // +/- range around target.z
+    speed?: number;
   }): Enemie {
     const yMin = opts.yMin ?? 20;
     const yMax = opts.yMax ?? 40;
@@ -154,28 +159,28 @@ class Enemie {
     const below = -(yMin + Math.random() * (yMax - yMin)); // negative offset
     const pos = new THREE.Vector3(
       targetPos.x + (Math.random() * 2 - 1) * xSpread, // lateral jitter (X)
-      targetPos.y + below,                              // start below
-      targetPos.z + (Math.random() * 2 - 1) * zSpread   // lateral jitter (Z)
+      targetPos.y + below, // start below
+      targetPos.z + (Math.random() * 2 - 1) * zSpread // lateral jitter (Z)
     );
 
     return new Enemie({
       scene: opts.scene,
       target: opts.target,
       position: pos,
-      speed: opts.speed ?? 2.2
+      speed: opts.speed ?? 2.2,
     });
   }
 
   static spawnFromAboveY(opts: {
-    scene: THREE.Scene,
-    target: THREE.Object3D,
-    yMin?: number,       // near distance above (positive)
-    yMax?: number,       // far distance above (positive)
-    xSpread?: number,
-    zSpread?: number,
-    speed?: number
+    scene: THREE.Scene;
+    target: THREE.Object3D;
+    yMin?: number; // near distance above (positive)
+    yMax?: number; // far distance above (positive)
+    xSpread?: number;
+    zSpread?: number;
+    speed?: number;
   }): Enemie {
-    const yMin = opts.yMin ?? 18;   // positive distances
+    const yMin = opts.yMin ?? 18; // positive distances
     const yMax = opts.yMax ?? 36;
     const xSpread = opts.xSpread ?? 6;
     const zSpread = opts.zSpread ?? 6;
@@ -195,20 +200,19 @@ class Enemie {
       target: opts.target,
       position: pos,
       speed: opts.speed ?? 2.2,
-      velocity: new THREE.Vector3(0, -1, 0) // straight down
+      velocity: new THREE.Vector3(0, -1, 0), // straight down
     });
   }
-
 }
 
 class Player {
   constructor(scene: THREE.Scene, camera?: THREE.PerspectiveCamera) {
     const loader = new GLTFLoader();
     loader.load(
-      '/low_poly_violin/scene.gltf',
+      "/low_poly_violin/scene.gltf",
       (gltf) => {
         const root = gltf.scene;
-        root.traverse(o => {
+        root.traverse((o) => {
           if ((o as THREE.Mesh).isMesh) {
             (o as THREE.Mesh).castShadow = true;
             (o as THREE.Mesh).receiveShadow = true;
@@ -221,7 +225,6 @@ class Player {
 
         // shift the model so its center sits at the pivot origin
         root.position.sub(center);
-
 
         // HELP ME OH SO HELP ME GOD WHAT THE HELL IS THIS CODE WHAT THE HELL
 
@@ -254,15 +257,14 @@ class Player {
       },
       (xhr) => {
         const pct = xhr.total ? (xhr.loaded / xhr.total) * 100 : 0;
-        console.log(pct.toFixed(1) + '% loaded');
+        console.log(pct.toFixed(1) + "% loaded");
       },
       (error) => {
-        console.error('GLTF load error:', error);
+        console.error("GLTF load error:", error);
       }
     );
   }
 }
-
 
 export function setCurrentScene(scene: THREE.Scene) {
   currentScene = scene;
@@ -277,7 +279,7 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
       modelPivot.position.x += 10 * dt;
     }
 
-    if (currentlyFacing == Direction.LEFT  && modelPivot.position.x > -20) {
+    if (currentlyFacing == Direction.LEFT && modelPivot.position.x > -20) {
       modelPivot.position.x -= 10 * dt;
     }
   }
@@ -298,16 +300,22 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
       const dist = e.mesh.position.distanceTo(playerPos);
-      if (dist <= (e.radius + playerColliderRadius) - 10) {
+      if (dist <= e.radius + playerColliderRadius - 10) {
         // Fire the custom event with some useful context
         emitPlayerHit({
           time: performance.now(),
           enemyIndex: i,
           enemyPosition: e.mesh.position.clone(),
-          playerPosition: playerPos.clone()
+          playerPosition: playerPos.clone(),
+          remainingLives: Math.max(0, lives - 1),
         });
 
         lives = Math.max(0, lives - 1);
+        if (lives <= 0) {
+          emitPlayerDies({
+            time: performance.now(),
+          });
+        }
 
         // Remove the enemy so it doesn't trigger again this frame
         e.dispose();
@@ -319,7 +327,6 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   renderer.render(currentScene, camera);
 }
 
-
 // this is the only good part in this code because it was coded in the morning
 function addTriangles(scene: THREE.Scene, triangles: Array<Array<THREE.Vector3>>) {
   triangles.forEach((triangle) => {
@@ -329,12 +336,8 @@ function addTriangles(scene: THREE.Scene, triangles: Array<Array<THREE.Vector3>>
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute([
-        a.x, a.y, a.z,
-        b.x, b.y, b.z,
-        c.x, c.y, c.z
-      ], 3)
+      "position",
+      new THREE.Float32BufferAttribute([a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z], 3)
     );
 
     geometry.computeVertexNormals();
@@ -342,7 +345,7 @@ function addTriangles(scene: THREE.Scene, triangles: Array<Array<THREE.Vector3>>
     const material = new THREE.MeshStandardMaterial({
       color: 0xff5533,
       side: THREE.DoubleSide,
-      flatShading: true
+      flatShading: true,
     });
 
     const triangleMesh = new THREE.Mesh(geometry, material);
@@ -357,9 +360,9 @@ export function startGame(camera: THREE.PerspectiveCamera) {
     return;
   }
   // Generate Perlin noise map
-  const width = 100;  // Width of the terrain grid
+  const width = 100; // Width of the terrain grid
   const height = 100; // Height of the terrain grid
-  const scale = 5;    // Scale of the terrain (controls smoothness)
+  const scale = 5; // Scale of the terrain (controls smoothness)
 
   const noiseMap = generatePerlinNoiseMap(width, height, scale);
   // Create terrain mesh from the noise map and add it to the scene
@@ -369,21 +372,21 @@ export function startGame(camera: THREE.PerspectiveCamera) {
 
   let facing = Direction.CENTER;
   document.addEventListener("keydown", (e) => {
-    if (e.key === 'a' || e.key === 'ArrowLeft') {
+    if (e.key === "a" || e.key === "ArrowLeft") {
       if (facing != Direction.LEFT) {
         modelPivot!.rotation.y = -Math.PI / 4;
       }
       facing = Direction.LEFT;
     }
 
-    if (e.key === 'd' || e.key === 'ArrowRight') {
+    if (e.key === "d" || e.key === "ArrowRight") {
       if (facing != Direction.RIGHT) {
         modelPivot!.rotation.y = Math.PI / 4;
       }
       facing = Direction.RIGHT;
     }
 
-    if (e.key === 's' || e.key === 'ArrowDown') {
+    if (e.key === "s" || e.key === "ArrowDown") {
       if (facing != Direction.CENTER) {
         modelPivot!.rotation.y = 0;
       }
@@ -392,7 +395,7 @@ export function startGame(camera: THREE.PerspectiveCamera) {
 
     const surviveHandle = setInterval(() => {
       emitPlayerSurvive100m({
-        time: performance.now()
+        time: performance.now(),
       });
     }, 1000);
 
@@ -401,27 +404,27 @@ export function startGame(camera: THREE.PerspectiveCamera) {
 
   const spawnHandle = setInterval(() => {
     if (!modelPivot) return; // wait for GLTF to finish
-    enemies.push(Enemie.spawnFromAboveY({
-      scene: mainScene,
-      target: modelPivot!,
-      yMin: 20,
-      yMax: 30,
-      xSpread: 32,
-      zSpread: 0,
-      speed: 2.2
-    }));
-
+    enemies.push(
+      Enemie.spawnFromAboveY({
+        scene: mainScene,
+        target: modelPivot!,
+        yMin: 20,
+        yMax: 30,
+        xSpread: 32,
+        zSpread: 0,
+        speed: 2.2,
+      })
+    );
 
     if (enemies.length > 100) {
       const e = enemies.shift();
       e?.dispose();
     }
   }, 1500); // faster cadence feels better when they come in lanes
-
 }
 
 export function graphicsInit() {
-  console.log("Initializing Graphics...")
+  console.log("Initializing Graphics...");
 
   const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.6);
   hemi.position.set(0, 1, 0);
@@ -458,7 +461,9 @@ export function graphicsInit() {
   const ro = new ResizeObserver(resizeToApp);
   ro.observe(appDiv);
 
-  renderer.setAnimationLoop(() => { render(renderer, camera) });
+  renderer.setAnimationLoop(() => {
+    render(renderer, camera);
+  });
 
   isGraphicsInitialized = true;
   startGame(camera);
@@ -467,7 +472,7 @@ export function graphicsInit() {
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Content Loaded");
   graphicsInit();
-})
+});
 
 document.addEventListener(PLAYER_HIT_EVENT, (e: Event) => {
   const ce = e as CustomEvent;
@@ -476,5 +481,10 @@ document.addEventListener(PLAYER_HIT_EVENT, (e: Event) => {
 
 document.addEventListener(PLAYER_SURVIVE_100M_EVENT, (e: Event) => {
   const ce = e as CustomEvent;
-  console.log("[EVENT] playerSurvive100meteres", ce.detail);
+  //console.log("[EVENT] playerSurvive100meteres", ce.detail);
+});
+
+document.addEventListener(PLAYER_DIES_EVENT, (e: Event) => {
+  const ce = e as CustomEvent;
+  console.log("[EVENT] playerdies", ce.detail);
 });
