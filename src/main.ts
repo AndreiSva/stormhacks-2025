@@ -11,6 +11,12 @@ let currentScene = mainScene;
 let isGraphicsInitialized: boolean = false;
 let modelPivot: THREE.Group | null = null;
 
+const Direction = {
+  LEFT: "LEFT",
+  CENTER: "CENTER",
+  RIGHT: "RIGHT"
+};
+
 class Player {
   constructor(scene: THREE.Scene, camera?: THREE.PerspectiveCamera) {
     const loader = new GLTFLoader();
@@ -115,18 +121,12 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   const width = 100;  // Width of the terrain grid
   const height = 100; // Height of the terrain grid
   const scale = 5;    // Scale of the terrain (controls smoothness)
-  
+
   const noiseMap = generatePerlinNoiseMap(width, height, scale);
   // Create terrain mesh from the noise map and add it to the scene
   createMeshFromNoiseMap(mainScene, noiseMap, width, height, scale);
 
   let player = new Player(mainScene, camera);
-
-  const Direction = {
-    LEFT: "LEFT",
-    CENTER: "CENTER",
-    RIGHT: "RIGHT"
-  };
 
   let facing = Direction.CENTER;
   document.addEventListener("keydown", (e) => {
@@ -168,6 +168,7 @@ export function graphicsInit() {
   // Use temporary aspect; we’ll immediately update it from appDiv’s rect.
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
   camera.position.set(0, 1.2, 3);
+  camera.rotation.x = Math.PI / 6;
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
