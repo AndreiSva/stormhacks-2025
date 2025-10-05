@@ -70,8 +70,8 @@ class Enemie {
 
     // Cull after it has passed the player by 10 units in its travel direction
     const relY = this.mesh.position.y - playerPos.y;
-    if (this.velocity.y < 0 && relY < -10) return false; // moving down, passed below
-    if (this.velocity.y > 0 && relY > 10)  return false; // moving up, passed above
+    if (this.velocity.y < 0 && relY < -50) return false; // moving down, passed below
+    if (this.velocity.y > 0 && relY > 50)  return false; // moving up, passed above
 
     if (this.mesh.position.lengthSq() > 1e6) return false; // safety
     return true;
