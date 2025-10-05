@@ -21,6 +21,8 @@ const Direction = {
 const enemies: Enemie[] = [];
 const clock = new THREE.Clock(); // for smooth dt-based motion
 
+let cameraRig: THREE.Group | null = null;
+
 let currentlyFacing = Direction.CENTER;
 
 export let lives = NUM_LIVES;
@@ -28,6 +30,9 @@ export let lives = NUM_LIVES;
 export const PLAYER_HIT_EVENT = "playerhit";
 export const PLAYER_SURVIVE_100M_EVENT = "playerSurvive100meteres";
 export const PLAYER_DIES_EVENT = "playerdies";
+
+const music = new Audio('/glamour.m4a');
+music.loop = true;
 
 function emitPlayerHit(detail: any) {
   document.dispatchEvent(new CustomEvent(PLAYER_HIT_EVENT, { detail }));
@@ -240,19 +245,28 @@ class Player {
         scene.add(modelPivot);
 
         if (camera && camera instanceof THREE.PerspectiveCamera) {
-          const box = new THREE.Box3().setFromObject(root);
-          const size = box.getSize(new THREE.Vector3()).length();
-          const center = box.getCenter(new THREE.Vector3());
+          // Make a rig that's parented to the player pivot.
+          cameraRig = new THREE.Group();
+          modelPivot.add(cameraRig);
 
-          const fitDist = size / (2 * Math.tan((camera.fov * Math.PI) / 360));
-          const dir = new THREE.Vector3(0, 0, 1);
-          camera.position.copy(center.clone().add(dir.multiplyScalar(fitDist * 1.2)));
-          camera.position.y -= 20;
-          camera.near = size / 100;
-          camera.far = size * 10;
+          // Put the rig at the pivot so camera coordinates are local to the violin.
+          cameraRig.position.set(0, 0, 0);
+
+          // Parent the camera under the rig and set a nice local offset.
+          // (z > 0 means "behind" the player if the player faces -Z; tweak to taste)
+          cameraRig.add(camera);
+          camera.position.set(0, 1.2, 3);
+
+          // Reasonable clip planes for a moderately sized scene
+          camera.near = 0.1;
+          camera.far = 1000;
           camera.updateProjectionMatrix();
-          camera.lookAt(center);
-          camera.rotation.x = THREE.MathUtils.degToRad(65);
+
+          // Look at the player pivot's local origin (since camera is now a child).
+          camera.lookAt(0, 0, 0);
+
+          // Optional tilt for a slightly top-down feel
+          camera.rotation.x = THREE.MathUtils.degToRad(35);
         }
       },
       (xhr) => {
@@ -350,11 +364,11 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   // Generate and render the terrain based on the player's position
   // Pass the camera parameter
   generateAndRenderTerrain(
-    posX, 
-    posY, 
-    scale, 
-    genDistance, 
-    renderDistance, 
+    posX,
+    posY,
+    scale,
+    genDistance,
+    renderDistance,
     mainScene,
     camera  // Add camera parameter
   );
@@ -435,6 +449,11 @@ export function graphicsInit() {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   appDiv.appendChild(renderer.domElement);
+
+  document.addEventListener('on', () => {
+    startMusic().play();
+  });
+
 
   function resizeToApp() {
     const rect = appDiv.getBoundingClientRect();
