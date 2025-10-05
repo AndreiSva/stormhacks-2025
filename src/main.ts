@@ -17,6 +17,172 @@ const Direction = {
   RIGHT: "RIGHT"
 };
 
+const enemies: Enemie[] = [];
+const clock = new THREE.Clock(); // for smooth dt-based motion
+
+
+
+class Enemie {
+  scene: THREE.Scene;
+  target: THREE.Object3D;
+  mesh: THREE.Mesh;
+  speed: number;
+  velocity: THREE.Vector3
+
+  constructor(opts: {
+    scene: THREE.Scene,
+    target: THREE.Object3D,
+    position?: THREE.Vector3,
+    speed?: number
+    velocity?: THREE.Vector3
+  }) {
+    const { scene, target } = opts;
+    this.scene = scene;
+    this.target = target;
+    this.speed = opts.speed ?? 5.0; // <-- respect provided speed
+    this.velocity = opts.velocity?.clone()?.normalize() ?? new THREE.Vector3(0, -1, 0); // default +Y
+
+    const r = 3;
+    const geom = new THREE.SphereGeometry(r, 16, 16);
+    const mat  = new THREE.MeshStandardMaterial({
+      color: 0xffeb3b,
+      emissive: 0x2b2500,
+      metalness: 0.1,
+      roughness: 0.6
+    });
+
+    this.mesh = new THREE.Mesh(geom, mat);
+    this.mesh.castShadow = true;
+    this.mesh.receiveShadow = true;
+
+    if (opts.position) {
+      this.mesh.position.copy(opts.position);
+    }
+
+    scene.add(this.mesh);
+  }
+
+  update(dt: number): boolean {
+    this.mesh.position.addScaledVector(this.velocity, this.speed * dt);
+
+    const playerPos = new THREE.Vector3();
+    this.target.getWorldPosition(playerPos);
+
+    // Cull after it has passed the player by 10 units in its travel direction
+    const relY = this.mesh.position.y - playerPos.y;
+    if (this.velocity.y < 0 && relY < -10) return false; // moving down, passed below
+    if (this.velocity.y > 0 && relY > 10)  return false; // moving up, passed above
+
+    if (this.mesh.position.lengthSq() > 1e6) return false; // safety
+    return true;
+  }
+
+  dispose() {
+    this.scene.remove(this.mesh);
+    this.mesh.geometry.dispose();
+    (this.mesh.material as THREE.Material).dispose();
+  }
+
+  static spawnFromNegativeZ(opts: {
+    scene: THREE.Scene,
+    target: THREE.Object3D,
+    zMin?: number,
+    zMax?: number,
+    xSpread?: number,
+    y?: number,
+    speed?: number
+  }): Enemie {
+    const zMin = opts.zMin ?? 20;
+    const zMax = opts.zMax ?? 40;
+    const xSpread = opts.xSpread ?? 6;
+    const y = opts.y ?? 0.6;
+
+    const targetPos = new THREE.Vector3();
+    opts.target.getWorldPosition(targetPos);
+
+    // pick a z behind the player (more negative)
+    const behind = -(zMin + Math.random() * (zMax - zMin));
+    const pos = new THREE.Vector3(
+      targetPos.x + (Math.random() * 2 - 1) * xSpread, // lateral jitter
+      y,
+      targetPos.z + behind
+    );
+
+    return new Enemie({
+      scene: opts.scene,
+      target: opts.target,
+      position: pos,
+      speed: opts.speed ?? 2.2
+    });
+  }
+
+  static spawnFromNegativeY(opts: {
+    scene: THREE.Scene,
+    target: THREE.Object3D,
+    yMin?: number,       // how far below to start (near)
+    yMax?: number,       // how far below to start (far)
+    xSpread?: number,    // +/- range around target.x
+    zSpread?: number,    // +/- range around target.z
+    speed?: number
+  }): Enemie {
+    const yMin = opts.yMin ?? 20;
+    const yMax = opts.yMax ?? 40;
+    const xSpread = opts.xSpread ?? 6;
+    const zSpread = opts.zSpread ?? 6;
+
+    const targetPos = new THREE.Vector3();
+    opts.target.getWorldPosition(targetPos);
+
+    const below = -(yMin + Math.random() * (yMax - yMin)); // negative offset
+    const pos = new THREE.Vector3(
+      targetPos.x + (Math.random() * 2 - 1) * xSpread, // lateral jitter (X)
+      targetPos.y + below,                              // start below
+      targetPos.z + (Math.random() * 2 - 1) * zSpread   // lateral jitter (Z)
+    );
+
+    return new Enemie({
+      scene: opts.scene,
+      target: opts.target,
+      position: pos,
+      speed: opts.speed ?? 2.2
+    });
+  }
+
+  static spawnFromAboveY(opts: {
+    scene: THREE.Scene,
+    target: THREE.Object3D,
+    yMin?: number,       // near distance above (positive)
+    yMax?: number,       // far distance above (positive)
+    xSpread?: number,
+    zSpread?: number,
+    speed?: number
+  }): Enemie {
+    const yMin = opts.yMin ?? 18;   // positive distances
+    const yMax = opts.yMax ?? 36;
+    const xSpread = opts.xSpread ?? 6;
+    const zSpread = opts.zSpread ?? 6;
+
+    const targetPos = new THREE.Vector3();
+    opts.target.getWorldPosition(targetPos);
+
+    const dist = yMin + Math.random() * (yMax - yMin); // 18..36
+    const pos = new THREE.Vector3(
+      targetPos.x + (Math.random() * 2 - 1) * xSpread,
+      targetPos.y + dist, // actually above the player
+      targetPos.z + (Math.random() * 2 - 1) * zSpread
+    );
+
+    return new Enemie({
+      scene: opts.scene,
+      target: opts.target,
+      position: pos,
+      speed: opts.speed ?? 2.2,
+      velocity: new THREE.Vector3(0, -1, 0) // straight down
+    });
+  }
+
+}
+
 class Player {
   constructor(scene: THREE.Scene, camera?: THREE.PerspectiveCamera) {
     const loader = new GLTFLoader();
@@ -37,6 +203,9 @@ class Player {
 
         // shift the model so its center sits at the pivot origin
         root.position.sub(center);
+
+
+        // HELP ME OH SO HELP ME GOD WHAT THE HELL IS THIS CODE WHAT THE HELL
 
         // create a pivot at the original center and parent the model to it
         modelPivot = new THREE.Group();
@@ -77,9 +246,19 @@ export function setCurrentScene(scene: THREE.Scene) {
 }
 
 function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
+  const dt = clock.getDelta();
   if (modelPivot) {
     modelPivot.position.x = Math.sin(Date.now() * 0.001) * 2;
   }
+  // Update enemies
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const keep = enemies[i].update(dt);
+    if (!keep) {
+      enemies[i].dispose();
+      enemies.splice(i, 1);
+    }
+  }
+
   renderer.render(currentScene, camera);
 }
 
@@ -152,6 +331,26 @@ export function startGame(camera: THREE.PerspectiveCamera) {
       facing = Direction.CENTER;
     }
   });
+
+  const spawnHandle = setInterval(() => {
+    if (!modelPivot) return; // wait for GLTF to finish
+    enemies.push(Enemie.spawnFromAboveY({
+      scene: mainScene,
+      target: modelPivot!,
+      yMin: 18,
+      yMax: 36,
+      xSpread: 8,
+      zSpread: 8,
+      speed: 2.2
+    }));
+
+
+    if (enemies.length > 100) {
+      const e = enemies.shift();
+      e?.dispose();
+    }
+  }, 1500); // faster cadence feels better when they come in lanes
+
 }
 
 export function graphicsInit() {
