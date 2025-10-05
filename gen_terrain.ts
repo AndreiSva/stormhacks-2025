@@ -5,6 +5,16 @@ import Delaunator from 'https://cdn.skypack.dev/delaunator@5.0.0';
 
 // Create a single global noise instance with a fixed seed for consistency
 const globalNoiseInstance = new noise.Noise(12345);
+// A list of 7 colors to map to your terrain heights
+const colorGradient = [
+  new THREE.Color(0x000000),  // Black
+  new THREE.Color(0x5a5a5a),  // Dark gray
+  new THREE.Color(0x999999),  // Gray
+  new THREE.Color(0x66cc66),  // Greenish
+  new THREE.Color(0x339933),  // Dark green
+  new THREE.Color(0x8b4513),  // Brown
+  new THREE.Color(0xffffff)   // White
+];
 
 // Chunk management system
 interface ChunkData {
@@ -29,8 +39,8 @@ class TerrainChunkManager {
 
   constructor(
     scene: THREE.Scene,
-    chunkSize: number = 16,
-    tileScale: number = 5,
+    chunkSize: number = 40,
+    tileScale: number = 2,
     loadDistance: number = 3,
     unloadDistance: number = 5
   ) {
@@ -106,6 +116,8 @@ class TerrainChunkManager {
   }
 
   // Generate noise map
+  // Generate noise map using Fractal Brownian Motion (fBm)
+  // Generate noise map using Fractal Brownian Motion (fBm)
   private generatePerlinNoiseMap(
     width: number,
     height: number,
@@ -115,16 +127,40 @@ class TerrainChunkManager {
   ): number[][] {
     const map: number[][] = [];
     const noiseFrequency = 20;
+    
+    // fBm parameters
+    const octaves = 8; // Number of noise layers
+    const lacunarity = 2.0; // Frequency multiplier per octave
+    const persistence = 0.5; // Amplitude multiplier per octave
 
     for (let i = 0; i < height; i++) {
       const row: number[] = [];
       for (let j = 0; j < width; j++) {
         const worldX = offsetX + j * scale;
         const worldY = offsetY + i * scale;
-        const x = worldX / noiseFrequency;
-        const y = worldY / noiseFrequency;
-        const height = globalNoiseInstance.perlin2(x, y);
-        row.push(height);
+        
+        // Compute fBm
+        let amplitude = 1.0;
+        let frequency = 2.0;
+        let noiseValue = 1.0;
+        let maxValue = 0.0; // For normalization
+        
+        for (let octave = 0; octave < octaves; octave++) {
+          const x = (worldX / noiseFrequency) * frequency;
+          const y = (worldY / noiseFrequency) * frequency;
+          
+          const sample = globalNoiseInstance.perlin2(x, y);
+          noiseValue += sample * amplitude;
+          maxValue += amplitude;
+          
+          amplitude *= persistence;
+          frequency *= lacunarity;
+        }
+        
+        // Normalize to [-1, 1] range
+        noiseValue /= maxValue;
+        
+        row.push(noiseValue);
       }
       map.push(row);
     }
@@ -306,6 +342,7 @@ class TerrainChunkManager {
   }
 
   // Create mesh using Delaunay triangulation
+  // Create mesh using Delaunay triangulation
   private createMeshFromDelaunay(
     points: { x: number; y: number; z: number }[],
     offsetX: number,
@@ -332,41 +369,87 @@ class TerrainChunkManager {
 
     // Build geometry from triangulation
     const positions: number[] = [];
+    const colors: number[] = [];
     const indices: number[] = [];
 
-    // Add all vertices
+    // Find min and max heights for this chunk
+    let minHeight = Infinity;
+    let maxHeight = -Infinity;
     points.forEach(p => {
-      positions.push(p.x, p.y, p.z);
+      minHeight = Math.min(minHeight, p.z);
+      maxHeight = Math.max(maxHeight, p.z);
     });
 
-    // Add triangles
+    // Prevent division by zero
+    const heightRange = maxHeight - minHeight || 1;
+
+    // Process triangles and calculate colors
+    const validTriangles: number[][] = [];
     for (let i = 0; i < delaunay.triangles.length; i += 3) {
       const i0 = delaunay.triangles[i];
       const i1 = delaunay.triangles[i + 1];
       const i2 = delaunay.triangles[i + 2];
 
-      // Optional: Filter out very large triangles (spanning chunk boundaries)
       const p0 = points[i0];
       const p1 = points[i1];
       const p2 = points[i2];
 
+      // Filter out very large triangles
       const d01 = Math.hypot(p0.x - p1.x, p0.y - p1.y);
       const d12 = Math.hypot(p1.x - p2.x, p1.y - p2.y);
       const d20 = Math.hypot(p2.x - p0.x, p2.y - p0.y);
 
-      const maxEdge = chunkWorldSize * 0.5; // Filter out triangles with edges > half chunk size
+      const maxEdge = chunkWorldSize * 0.5;
       if (d01 < maxEdge && d12 < maxEdge && d20 < maxEdge) {
-        indices.push(i0, i1, i2);
+        // Calculate triangle center height
+        const centerHeight = (p0.z + p1.z + p2.z) / 3;
+        
+        // Normalize height to [0, 1]
+        const normalizedHeight = (centerHeight - minHeight) / heightRange;
+        
+        // Map to color gradient
+        const colorIndex = normalizedHeight * (colorGradient.length - 1);
+        const lowerIndex = Math.floor(colorIndex);
+        const upperIndex = Math.min(lowerIndex + 1, colorGradient.length - 1);
+        const t = colorIndex - lowerIndex;
+        
+        // Interpolate between colors
+        const color = new THREE.Color();
+        color.lerpColors(colorGradient[lowerIndex], colorGradient[upperIndex], t);
+
+        validTriangles.push([i0, i1, i2, color.r, color.g, color.b]);
       }
     }
 
+    // Build geometry with vertex colors
+    const vertexMap = new Map<number, number>();
+    let vertexIndex = 0;
+
+    validTriangles.forEach(([i0, i1, i2, r, g, b]) => {
+      const triangle = [i0, i1, i2];
+      
+      triangle.forEach(originalIndex => {
+        if (!vertexMap.has(originalIndex)) {
+          const p = points[originalIndex];
+          positions.push(p.x, p.y, p.z);
+          vertexMap.set(originalIndex, vertexIndex);
+          vertexIndex++;
+        }
+        
+        const mappedIndex = vertexMap.get(originalIndex)!;
+        indices.push(mappedIndex);
+        colors.push(r, g, b);
+      });
+    });
+
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0xff5533,
+      vertexColors: true,
       side: THREE.DoubleSide,
       flatShading: true
     });
