@@ -531,12 +531,7 @@ export function graphicsInit() {
   });
 
   isGraphicsInitialized = true;
-  console.log("Graphics initialized.");
-  document.addEventListener("startgame", () => {
-    console.log("startgame event received");
-    startGame(camera);
-    console.log("Game started");
-  });
+  startGame(camera);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
