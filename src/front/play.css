@@ -18,41 +18,6 @@ body.play-body {
   flex-direction: column;
 }
 
-/* Header adjustments for play page */
-body.play-body .header {
-  flex-shrink: 0;
-}
-
-body.play-body .navbar {
-  position: relative;
-}
-
-/* ============================================
-   STANDARD RED EXIT BUTTON
-   ============================================ */
-
-.exit-game-btn {
-  padding: 0.6rem 1.5rem;
-  background: #dc2626;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-  font-family: inherit;
-  margin-left: auto;
-}
-
-.exit-game-btn:hover {
-  transform: scale(1.1);
-}
-
-.exit-game-btn:active {
-  transform: scale(1.05);
-}
-
 /* ============================================
    PLAY CONTAINER - CENTERED BOX WITH BORDER
    ============================================ */
@@ -67,10 +32,208 @@ body.play-body .navbar {
   overflow: hidden;
 }
 
+/* ============================================
+   GAME STATS HUD
+   ============================================ */
+#game-stats {
+  position: absolute;
+  top: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  background: linear-gradient(135deg, rgba(10, 14, 39, 0.85), rgba(26, 31, 58, 0.85));
+  padding: 1rem 2.5rem;
+  border-radius: 16px;
+  border: 2px solid rgba(0, 217, 255, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 217, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  z-index: 100;
+  font-family: "Courier New", monospace;
+}
+
+#game-stats > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  position: relative;
+}
+
+#game-stats > div::before {
+  content: attr(data-label);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+}
+
+#distance {
+  color: #00ffcc;
+  font-size: 1.8rem;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+  min-width: 120px;
+  text-align: center;
+}
+
+#lives {
+  color: #ff3366;
+  font-size: 1.8rem;
+  font-weight: bold;
+  text-shadow: 0 0 10px rgba(255, 51, 102, 0.5);
+  min-width: 80px;
+  text-align: center;
+}
+
+/* Separator line between stats */
+#game-stats > div:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: -1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 60%;
+  background: linear-gradient(to bottom, transparent, rgba(0, 217, 255, 0.3), transparent);
+}
+
+/* Restart button in HUD */
+#game-stats .restart-game-btn {
+  padding: 0.6rem 1.5rem;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: "Segoe UI", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+#game-stats .restart-game-btn:hover {
+  transform: scale(1.05);
+  background: linear-gradient(135deg, #34d399, #10b981);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+#game-stats .restart-game-btn:active {
+  transform: scale(0.98);
+}
+
+/* Mobile responsive for restart button */
+@media (max-width: 768px) {
+  #game-stats .restart-game-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Exit button in HUD */
+#game-stats .exit-game-btn {
+  padding: 0.6rem 1.5rem;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: "Segoe UI", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+}
+
+#game-stats .exit-game-btn:hover {
+  transform: scale(1.05);
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.6);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+#game-stats .exit-game-btn:active {
+  transform: scale(0.98);
+}
+
+/* Pulse animation for lives when low */
+@keyframes pulseLives {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+#lives[data-low="true"] {
+  animation: pulseLives 1s ease-in-out infinite;
+  color: #ff1744;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  #game-stats {
+    top: 1rem;
+    gap: 1.5rem;
+    padding: 0.8rem 1.5rem;
+    border-width: 1px;
+  }
+
+  #distance,
+  #lives {
+    font-size: 1.4rem;
+    min-width: 80px;
+  }
+
+  #game-stats > div::before {
+    font-size: 0.6rem;
+  }
+
+  #game-stats .exit-game-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  #game-stats > div:not(:last-child)::after {
+    right: -0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  #game-stats {
+    flex-direction: column;
+    gap: 0.8rem;
+    padding: 0.8rem 1.2rem;
+  }
+
+  #game-stats > div:not(:last-child)::after {
+    display: none;
+  }
+
+  #distance,
+  #lives {
+    font-size: 1.2rem;
+  }
+}
+
+/* ============================================
+   GAME CANVAS STYLES
+   ============================================ */
 #app {
   width: 100%;
   max-width: 1600px;
-  height: 100%;
+  height: 90%;
   display: block;
   position: relative;
   border: 3px solid #ffffff;

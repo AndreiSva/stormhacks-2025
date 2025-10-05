@@ -9,7 +9,7 @@
     <link rel="icon" type="image/svg+xml" href="../../public/logo.svg" />
   </head>
   <body class="play-body">
-    <!-- Header with Exit Button -->
+    <!-- Header -->
     <header class="header">
       <nav class="navbar">
         <div class="nav-brand">
@@ -20,16 +20,22 @@
           <li><a href="/src/front/about.html">About</a></li>
           <li><a href="/src/front/play.html" class="active">Play</a></li>
         </ul>
-        <button class="exit-game-btn" onclick="window.location.href='/'">Exit Game</button>
       </nav>
     </header>
 
     <!-- Main Game Content -->
     <main class="play-container">
+      <div id="game-stats">
+        <div id="time">Time: 0s</div>
+        <div id="lives">Lives: 3</div>
+        <button class="restart-game-btn" onclick="window.location.href='/src/front/play.html'">Restart</button>
+        <button class="exit-game-btn" onclick="window.location.href='/'">End Game</button>
+      </div>
       <!-- This is where main.ts will inject the game -->
       <div id="app"></div>
     </main>
 
     <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/front/playUI.ts"></script>
   </body>
 </html>
