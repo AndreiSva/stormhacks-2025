@@ -1,7 +1,7 @@
-import './style.css'
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import {generateAndRenderTerrain} from '../gen_terrain.ts';
+import "./style.css";
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { generateAndRenderTerrain } from "../gen_terrain.ts";
 
 const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
@@ -327,7 +327,6 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   renderer.render(currentScene, camera);
 }
 
-
 export function startGame(camera: THREE.PerspectiveCamera) {
   if (!isGraphicsInitialized) {
     console.log("startGame() needs graphics initialized");
@@ -350,13 +349,13 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   // Generate and render the terrain based on the player's position
   // Pass the camera parameter
   generateAndRenderTerrain(
-    posX, 
-    posY, 
-    scale, 
-    genDistance, 
-    renderDistance, 
+    posX,
+    posY,
+    scale,
+    genDistance,
+    renderDistance,
     mainScene,
-    camera  // Add camera parameter
+    camera // Add camera parameter
   );
 
   let player = new Player(mainScene, camera);
@@ -414,7 +413,6 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   }, 1500); // faster cadence feels better when they come in lanes
 }
 
-
 export function graphicsInit() {
   console.log("Initializing Graphics...");
 
@@ -458,11 +456,20 @@ export function graphicsInit() {
   });
 
   isGraphicsInitialized = true;
-  startGame(camera);
+  console.log("Graphics initialized.");
+
+  // Start game logic when user clicks start
+  document.addEventListener("startgame", () => {
+    console.log("Starting game...");
+    startGame(camera);
+  });
 }
 
+// At the bottom, replace with:
+
+// Initialize graphics on DOM load (creates renderer, camera, scene)
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("Content Loaded");
+  console.log("Initializing graphics engine...");
   graphicsInit();
 });
 

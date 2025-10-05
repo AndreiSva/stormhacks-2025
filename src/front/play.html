@@ -6,10 +6,9 @@
     <title>Play - Violin Flight</title>
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="play.css" />
-    <link rel="icon" type="image/svg+xml" href="../../public/logo.svg" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
   </head>
   <body class="play-body">
-    <!-- Header -->
     <header class="header">
       <nav class="navbar">
         <div class="nav-brand">
@@ -23,18 +22,55 @@
       </nav>
     </header>
 
-    <!-- Main Game Content -->
-    <main class="play-container">
-      <div id="game-stats">
-        <div id="time">Time: 0s</div>
-        <div id="lives">Lives: 3</div>
-        <button class="restart-game-btn" onclick="window.location.href='/src/front/play.html'">Restart</button>
-        <button class="exit-game-btn" onclick="window.location.href='/'">End Game</button>
+    <!-- Start with loading screen content -->
+    <main id="main-container" class="play-container">
+      <!-- Loading Screen (visible initially) -->
+      <div id="loading-screen" class="loading-content">
+        <div class="loader-animation">
+          <div class="violin-icon">🎻</div>
+          <div class="loading-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+        <h1 class="loading-title">Violin Flight</h1>
+        <p class="loading-subtitle">Prepare for Takeoff</p>
+
+        <div class="controls-info">
+          <h3>Controls</h3>
+          <div class="controls-grid-loader">
+            <div class="control-item-loader">
+              <kbd>A</kbd>
+              <span>Left</span>
+            </div>
+            <div class="control-item-loader">
+              <kbd>D</kbd>
+              <span>Right</span>
+            </div>
+            <div class="control-item-loader">
+              <kbd>S</kbd>
+              <span>Center</span>
+            </div>
+          </div>
+        </div>
+
+        <button id="start-game-btn" class="start-btn" style="display: none">Start Flight</button>
       </div>
-      <!-- This is where main.ts will inject the game -->
-      <div id="app"></div>
+
+      <!-- Game Container (hidden initially) -->
+      <div id="game-container" class="game-container" style="display: none">
+        <div id="game-stats">
+          <div id="time">Time: 0s</div>
+          <div id="lives">Lives: 3</div>
+          <button class="restart-game-btn" onclick="window.location.href='/src/front/play.html'">Restart</button>
+          <button class="exit-game-btn" onclick="window.location.href='/'">End Game</button>
+        </div>
+        <div id="app"></div>
+      </div>
     </main>
 
+    <!-- Scripts are always loaded -->
     <script type="module" src="/src/main.ts"></script>
     <script type="module" src="/src/front/playUI.ts"></script>
   </body>
