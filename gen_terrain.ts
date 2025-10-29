@@ -367,17 +367,15 @@ class TerrainChunkManager {
     }
 
     // Prepare coordinates for Delaunator (only x, y for 2D triangulation)
-    // Pre-allocate array for better performance
+    // Use flat array constructor for best performance
     const coords: number[] = new Array(points.length * 2);
     for (let i = 0; i < points.length; i++) {
       coords[i * 2] = points[i].x;
       coords[i * 2 + 1] = points[i].y;
     }
 
-    // Perform Delaunay triangulation
-    const delaunay = Delaunator.from(coords.map((c, i) => 
-      i % 2 === 0 ? [coords[i], coords[i + 1]] : null
-    ).filter(Boolean) as number[][]);
+    // Perform Delaunay triangulation using flat array constructor
+    const delaunay = new Delaunator(coords);
 
     // Build geometry from triangulation
     const positions: number[] = [];
@@ -385,6 +383,7 @@ class TerrainChunkManager {
     const indices: number[] = [];
 
     // Find min and max heights for this chunk
+    // Safe initialization - we already checked points.length >= 3
     let minHeight = points[0].z;
     let maxHeight = points[0].z;
     for (let i = 1; i < points.length; i++) {
