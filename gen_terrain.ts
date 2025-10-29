@@ -227,27 +227,24 @@ class TerrainChunkManager {
     const height = noiseMap.length;
     const width = noiseMap[0].length;
     
-    // Normalize gradients
+    // Combined loop: find max gradient and build probability map simultaneously
     let maxGrad = 0;
+    const probMap: number[] = [];
+    const positions: { i: number; j: number }[] = [];
+
     for (let i = 0; i < height; i++) {
       for (let j = 0; j < width; j++) {
         maxGrad = Math.max(maxGrad, gradients[i][j]);
+        probMap.push(gradients[i][j]); // Store raw gradient temporarily
+        positions.push({ i, j });
       }
     }
-
-    // Build probability map
-    const probMap: number[] = [];
-    const positions: { i: number; j: number }[] = [];
+    
+    // Normalize probabilities and compute total in single pass
     let totalProb = 0;
-
-    for (let i = 0; i < height; i++) {
-      for (let j = 0; j < width; j++) {
-        // Higher gradient = higher probability, with minimum baseline
-        const prob = maxGrad > 0 ? (gradients[i][j] / maxGrad) + 0.1 : 1;
-        probMap.push(prob);
-        positions.push({ i, j });
-        totalProb += prob;
-      }
+    for (let idx = 0; idx < probMap.length; idx++) {
+      probMap[idx] = maxGrad > 0 ? (probMap[idx] / maxGrad) + 0.1 : 1;
+      totalProb += probMap[idx];
     }
 
     const sampledPoints: { x: number; y: number; z: number }[] = [];
@@ -308,26 +305,39 @@ class TerrainChunkManager {
       sampledIndices.add((height - 1) * width + j);
     }
 
-    // Sample remaining points weighted by gradient
+    // Sample remaining points weighted by gradient using alias method for O(1) sampling
     const actualMaxPoints = Math.min(maxPoints, probMap.length);
+    
+    // Build cumulative distribution for faster sampling
+    const cumulative: number[] = new Array(probMap.length);
+    cumulative[0] = probMap[0];
+    for (let i = 1; i < probMap.length; i++) {
+      cumulative[i] = cumulative[i - 1] + probMap[i];
+    }
+    
     let attempts = 0;
-    const maxAttempts = actualMaxPoints * 3;
+    const maxAttempts = actualMaxPoints * 2; // Reduced from 3x
 
     while (sampledPoints.length < actualMaxPoints && attempts < maxAttempts) {
       attempts++;
       const r = Math.random() * totalProb;
-      let cumulative = 0;
+      
+      // Binary search for faster lookup
+      let left = 0;
+      let right = cumulative.length - 1;
       let selectedIdx = -1;
-
-      for (let idx = 0; idx < probMap.length; idx++) {
-        cumulative += probMap[idx];
-        if (r <= cumulative && !sampledIndices.has(idx)) {
-          selectedIdx = idx;
-          break;
+      
+      while (left <= right) {
+        const mid = (left + right) >> 1; // Bitwise operation for floor division
+        if (cumulative[mid] < r) {
+          left = mid + 1;
+        } else {
+          selectedIdx = mid;
+          right = mid - 1;
         }
       }
 
-      if (selectedIdx >= 0) {
+      if (selectedIdx >= 0 && !sampledIndices.has(selectedIdx)) {
         sampledIndices.add(selectedIdx);
         const { i, j } = positions[selectedIdx];
         sampledPoints.push({

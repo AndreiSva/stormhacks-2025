@@ -286,14 +286,22 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   if (playerLoaded && playerRoot && modelPivot) {
     const playerPos = new THREE.Vector3();
     modelPivot.getWorldPosition(playerPos);
+    
+    // Pre-calculate upper collision point to avoid redundant vector creation
+    const upperY = playerPos.y + 15;
 
     for (let i = enemies.length - 1; i >= 0; i--) {
       const e = enemies[i];
-      const dist = e.mesh.position.distanceTo(playerPos);
+      const enemyPos = e.mesh.position;
+      const dist = enemyPos.distanceTo(playerPos);
 
-      let playerPos2 = new THREE.Vector3(playerPos);
-      playerPos2.y += 15;
-      const dist2 = e.mesh.position.distanceTo(playerPos2);
+      // Calculate distance to upper collision point without creating a new vector
+      const dx = enemyPos.x - playerPos.x;
+      const dy = enemyPos.y - upperY;
+      const dz = enemyPos.z - playerPos.z;
+      const dist2Sq = dx * dx + dy * dy + dz * dz;
+      const dist2 = Math.sqrt(dist2Sq);
+      
       if (dist <= e.radius + playerColliderRadius - 10 || dist2 <= e.radius) {
         hitSound.play();
         emitPlayerHit({
@@ -320,19 +328,7 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
   renderer.render(currentScene, camera);
 }
 
-function recalibrate() {
-  if (isGraphicsInitialized) {
-    if (modelPivot) {
-      for (let i = 0; i < modelPivot.position.x; i++) {
-        console.log("recalibrating...");
-        if (i < modelPivot.position.y) {
-          console.log("found issue");
-          return;
-        }
-      }
-    }
-  }
-}
+// Removed useless recalibrate function that did nothing but waste CPU cycles
 
 export function startGame(camera: THREE.PerspectiveCamera) {
   if (!isGraphicsInitialized) {
@@ -399,13 +395,17 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   });
 
   document.addEventListener("keyup", (e) => {
-    if (e.key === "a" || e.key === "ArrowLeft") turnLeftHeld = false;
-    if (e.key === "d" || e.key === "ArrowRight") turnRightHeld = false;
-    if (e.key === "s" || e.key === "ArrowDown") desiredFacing = Direction.CENTER;
-  });
-
-  document.addEventListener("keyup", () => {
-    desiredFacing = Direction.CENTER;
+    if (e.key === "a" || e.key === "ArrowLeft") {
+      turnLeftHeld = false;
+      desiredFacing = Direction.CENTER;
+    }
+    if (e.key === "d" || e.key === "ArrowRight") {
+      turnRightHeld = false;
+      desiredFacing = Direction.CENTER;
+    }
+    if (e.key === "s" || e.key === "ArrowDown") {
+      desiredFacing = Direction.CENTER;
+    }
   });
 
   // Log terrain stats periodically (optional)
