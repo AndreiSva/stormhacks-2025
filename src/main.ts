@@ -29,6 +29,10 @@ const clock = new THREE.Clock(); // for smooth dt-based motion
 
 let cameraRig: THREE.Group | null = null;
 
+// Reusable vectors to reduce garbage collection
+const tempForwardVector = new THREE.Vector3();
+const tempPlayerPos = new THREE.Vector3();
+
 let playerRoot: THREE.Group | null = null; // moves & turns; true heading
 const MOVE_SPEED = 8; // units per second, constant forward
 const TURN_RATE = THREE.MathUtils.degToRad(180); // heading turn rate (deg/sec)
@@ -265,9 +269,10 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
 
     playerRoot.rotation.z = normalizeAngle(playerRoot.rotation.z + turnInput * TURN_RATE * dt);
 
-    const forwardLocal = new THREE.Vector3(0, 1, 0);
-    forwardLocal.applyQuaternion(playerRoot.quaternion);
-    playerRoot.position.addScaledVector(forwardLocal, MOVE_SPEED * dt);
+    // Reuse vector to reduce garbage collection
+    tempForwardVector.set(0, 1, 0);
+    tempForwardVector.applyQuaternion(playerRoot.quaternion);
+    playerRoot.position.addScaledVector(tempForwardVector, MOVE_SPEED * dt);
 
     // Update infinite terrain based on player position
     updateInfiniteTerrain(playerRoot.position.x, playerRoot.position.y, camera as THREE.PerspectiveCamera);
@@ -284,8 +289,9 @@ function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
 
   // Collision: enemies vs player
   if (playerLoaded && playerRoot && modelPivot) {
-    const playerPos = new THREE.Vector3();
-    modelPivot.getWorldPosition(playerPos);
+    // Reuse temp vector for player position
+    modelPivot.getWorldPosition(tempPlayerPos);
+    const playerPos = tempPlayerPos;
     
     // Pre-calculate upper collision point to avoid redundant vector creation
     const upperY = playerPos.y + 15;
