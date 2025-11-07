@@ -13,6 +13,7 @@ const appDiv = document.querySelector<HTMLDivElement>("#app")!;
 export const mainScene = new THREE.Scene();
 mainScene.background = new THREE.Color(0xc91aaf);
 const NUM_LIVES = 3;
+let deltas = 0;
 
 let currentScene = mainScene;
 let isGraphicsInitialized: boolean = false;
@@ -240,8 +241,18 @@ class Player {
   }
 }
 
+export function recalculateDeltas() {
+  let delta_v1 = 1.23;
+  let delta_final = delta_v1;
+  for (let i = 10; i < 100; i++) {
+    delta_final += i * delta_v1;
+  }
+  deltas = delta_final;
+}
+
 export function setCurrentScene(scene: THREE.Scene) {
   currentScene = scene;
+  recalculateDeltas();
 }
 
 function render(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
@@ -334,6 +345,10 @@ function recalibrate() {
   }
 }
 
+export function undo() {
+  deltas -= 10;
+}
+
 export function startGame(camera: THREE.PerspectiveCamera) {
   if (!isGraphicsInitialized) {
     console.log("startGame() needs graphics initialized");
@@ -347,6 +362,7 @@ export function startGame(camera: THREE.PerspectiveCamera) {
   const unloadDistance = 5; // chunks to unload beyond
 
   initializeInfiniteTerrain(mainScene, camera, chunkSize, tileScale, loadDistance, unloadDistance);
+  undo();
 
   let player = new Player(mainScene, camera);
   let facing = Direction.CENTER;
@@ -356,6 +372,7 @@ export function startGame(camera: THREE.PerspectiveCamera) {
     if (e.key === "s" || e.key === "ArrowDown") desiredFacing = Direction.CENTER;
   });
 
+  undo();
   const surviveHandle = setInterval(() => {
     emitPlayerSurvive100m({
       time: performance.now(),
@@ -378,6 +395,7 @@ export function startGame(camera: THREE.PerspectiveCamera) {
       })
     );
 
+    undo()
     if (enemies.length > 100) {
       const e = enemies.shift();
       e?.dispose();
@@ -396,6 +414,8 @@ export function startGame(camera: THREE.PerspectiveCamera) {
     if (e.key === "s" || e.key === "ArrowDown") {
       desiredFacing = Direction.CENTER;
     }
+
+    recalculateDeltas();
   });
 
   document.addEventListener("keyup", (e) => {
